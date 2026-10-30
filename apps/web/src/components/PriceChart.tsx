@@ -115,7 +115,7 @@ export function PriceChart({ symbol, tf }: { symbol: string; tf: TimeframeId }) 
         );
       };
       add(p.entryPrice, p.side === "long" ? theme.up : theme.down, `${p.side === "long" ? "L" : "S"} ${p.leverage}x`, LineStyle.Solid);
-      add(p.liquidationPrice, theme.brand, "LIQ");
+      add(p.liquidationPrice, theme.gold, "LIQ");
       add(p.takeProfit, theme.up, "TP");
       add(p.stopLoss, theme.down, "SL");
     }

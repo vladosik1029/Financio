@@ -1,23 +1,27 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap");
 
 /*
- * Палитра в духе терминала Bybit. --brand — временный акцент,
- * пока не подставлены фирменные цвета iZZi. Цвета графика — в lib/theme.ts.
+ * Тёмный терминал в фирменных цветах iZZi: тёплый шоколадный фон,
+ * градиент оранжевый → розовый для главных действий, жёлтый для опыта и наград.
+ * Цвета графика — в lib/theme.ts.
  */
 :root {
-  --bg: #0b0c0f;
-  --surface: #16181d;
-  --surface-2: #1f2228;
-  --border: #262a32;
-  --text: #eaecef;
-  --muted: #81858c;
+  --bg: #140d09;
+  --surface: #1f140e;
+  --surface-2: #2a1d15;
+  --border: #35261d;
+  --text: #fff8f1;
+  --muted: #9a8a80;
   --up: #20b26c;
-  --down: #ef454a;
+  --down: #f0444f;
   --up-soft: rgba(32, 178, 108, 0.14);
-  --down-soft: rgba(239, 69, 74, 0.14);
-  --brand: #f7a600;
-  --brand-soft: rgba(247, 166, 0, 0.12);
-  --brand-ink: #111;
+  --down-soft: rgba(240, 68, 79, 0.14);
+  --brand: #ff5a5c;
+  --brand-grad: linear-gradient(135deg, #ff7a3c, #ff387d);
+  --brand-soft: rgba(255, 90, 92, 0.12);
+  --brand-ink: #fff;
+  --gold: #ffc23d;
+  --gold-soft: rgba(255, 194, 61, 0.12);
   --radius: 10px;
   color-scheme: dark;
 }
@@ -69,7 +73,7 @@ input {
   font-size: 12px;
 }
 .accent {
-  color: var(--brand);
+  color: var(--gold);
 }
 .up {
   color: var(--up);
@@ -133,11 +137,11 @@ h3 {
   background: var(--down);
 }
 .btn-brand {
-  background: var(--brand);
+  background: var(--brand-grad);
   color: var(--brand-ink);
 }
 .btn-gold {
-  background: var(--brand);
+  background: var(--brand-grad);
   color: var(--brand-ink);
   width: auto;
   padding: 10px 16px;
@@ -187,7 +191,7 @@ h3 {
   white-space: nowrap;
 }
 .chip.active {
-  background: var(--brand);
+  background: var(--brand-grad);
   color: var(--brand-ink);
   font-weight: 600;
 }
@@ -279,7 +283,7 @@ h3 {
   place-items: center;
   font-size: 22px;
   font-weight: 700;
-  background: var(--brand);
+  background: var(--brand-grad);
   color: var(--brand-ink);
 }
 .trader-main {
@@ -304,7 +308,7 @@ h3 {
 .xp-fill,
 .quest-bar > div {
   height: 100%;
-  background: var(--brand);
+  background: var(--gold);
   transition: width 0.4s ease;
 }
 .balance {
@@ -775,7 +779,7 @@ h3 {
   height: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background: var(--brand);
+  background: var(--brand-grad);
   color: var(--brand-ink);
   font-size: 10px;
   font-weight: 700;
@@ -832,4 +836,20 @@ h3 {
   50% {
     background-color: rgba(239, 69, 74, 0.5);
   }
+}
+
+/* Шапка кабинета */
+.brand-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.brand-head span {
+  background: var(--brand-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
