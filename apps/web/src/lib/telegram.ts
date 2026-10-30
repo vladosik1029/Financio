@@ -1,3 +1,5 @@
+import { theme } from "./theme";
+
 /** Минимальные типы Telegram WebApp, которые использует игра */
 interface TelegramWebApp {
   initData: string;
@@ -32,8 +34,8 @@ export function initTelegram(): void {
   tg.expand();
   if (tg.isVersionAtLeast("7.7")) tg.disableVerticalSwipes?.();
   if (tg.isVersionAtLeast("6.1")) {
-    tg.setHeaderColor?.("#0b0e14");
-    tg.setBackgroundColor?.("#0b0e14");
+    tg.setHeaderColor?.(theme.bg);
+    tg.setBackgroundColor?.(theme.bg);
   }
 }
 

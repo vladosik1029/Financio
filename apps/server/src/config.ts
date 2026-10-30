@@ -15,6 +15,7 @@ const schema = z.object({
   NODE_ENV: z.string().default("development"),
   DATABASE_URL: z.string().default("pglite://./data/pglite"),
   ADMIN_TOKEN: z.string().default(""),
+  ADMIN_TELEGRAM_IDS: z.string().default(""),
 });
 
 const env = schema.parse(process.env);
@@ -32,6 +33,10 @@ export const config = {
   databaseUrl: env.DATABASE_URL,
   /** Пароль админки. Пустой — админка выключена */
   adminToken: env.ADMIN_TOKEN,
+  /** Telegram ID игроков, которым в MiniApp открыта вкладка админки */
+  adminIds: env.ADMIN_TELEGRAM_IDS.split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0),
 };
 
 if (config.adminToken && config.adminToken.length < 16) {

@@ -7,27 +7,28 @@ export function ProfileScreen() {
   const user = tg?.initDataUnsafe.user;
   return (
     <div className="screen profile">
-      <div className="field">
-        <div className="field-head">
+      <section className="card admin-form">
+        <div className="admin-field">
           <span>{t("profile.language")}</span>
+          <div className="chips">
+            {LANGUAGES.map((lang) => (
+              <button
+                key={lang}
+                className={i18n.language === lang ? "chip active" : "chip"}
+                onClick={() => setLanguage(lang)}
+              >
+                {lang.toUpperCase()}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="chips">
-          {LANGUAGES.map((lang) => (
-            <button
-              key={lang}
-              className={i18n.language === lang ? "chip active" : "chip"}
-              onClick={() => setLanguage(lang)}
-            >
-              {lang.toUpperCase()}
-            </button>
-          ))}
-        </div>
-      </div>
-      {user && (
-        <p className="muted">
-          {t("profile.id")}: <span className="mono">{user.id}</span>
-        </p>
-      )}
+        {user && (
+          <div className="admin-field">
+            <span>{t("profile.id")}</span>
+            <span className="mono">{user.id}</span>
+          </div>
+        )}
+      </section>
       <p className="muted small">{t("profile.disclaimer")}</p>
     </div>
   );

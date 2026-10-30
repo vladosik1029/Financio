@@ -25,8 +25,11 @@ const listQuery = z.object({
 const ACTIONS_PER_WINDOW = 5;
 const WINDOW_MS = 1000;
 
-export async function tradeRoutes(app: FastifyInstance, opts: { engine: TradingEngine }): Promise<void> {
-  const { engine } = opts;
+export async function tradeRoutes(
+  app: FastifyInstance,
+  opts: { engine: TradingEngine; adminIds: number[] },
+): Promise<void> {
+  const { engine, adminIds } = opts;
   const known = new Set<number>();
   const actions = new Map<number, number[]>();
 
@@ -63,7 +66,11 @@ export async function tradeRoutes(app: FastifyInstance, opts: { engine: TradingE
   app.get("/me", { preHandler: player }, async (req) => {
     // Свежие имя и язык из Telegram сохраняем при каждом открытии MiniApp
     await engine.ensureUser(req.tgUser!);
-    return { user: req.tgUser, profile: await engine.getProfile(req.tgUser!.id) };
+    return {
+      user: req.tgUser,
+      profile: await engine.getProfile(req.tgUser!.id),
+      isAdmin: adminIds.includes(req.tgUser!.id),
+    };
   });
 
   app.get("/positions", { preHandler: player }, async (req) => {

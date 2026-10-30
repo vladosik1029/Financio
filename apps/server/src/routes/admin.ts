@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { and, count, desc, eq, ilike, or, sql, sum } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { resolveTelegramUser } from "../auth/plugin.js";
 import type { Db } from "../db/index.js";
 import { ledger, positions, users } from "../db/schema.js";
 import type { MarketHub } from "../market/hub.js";
@@ -20,6 +21,7 @@ interface AdminDeps {
   settings: SettingsStore;
   hub: MarketHub;
   token: string;
+  adminIds: number[];
 }
 
 function tokenMatches(given: string, expected: string): boolean {
@@ -36,14 +38,24 @@ export async function adminPage(app: FastifyInstance, opts: { enabled: boolean }
   });
 }
 
-/** API админки: /api/admin/*, доступ по `Authorization: Bearer <ADMIN_TOKEN>` */
+/**
+ * API админки: /api/admin/*. Доступ из MiniApp по initData игрока из ADMIN_TELEGRAM_IDS
+ * (`Authorization: tma <initData>`) или со страницы /admin по `Authorization: Bearer <ADMIN_TOKEN>`.
+ */
 export async function adminRoutes(app: FastifyInstance, opts: AdminDeps): Promise<void> {
-  const { db, engine, settings, hub, token } = opts;
+  const { db, engine, settings, hub, token, adminIds } = opts;
 
   app.addHook("preHandler", async (req: FastifyRequest, reply: FastifyReply) => {
-    if (!token) return reply.code(404).send({ error: "admin_disabled" });
-    const given = (req.headers.authorization ?? "").replace(/^Bearer /, "");
-    if (!tokenMatches(given, token)) return reply.code(401).send({ error: "unauthorized" });
+    if (!token && adminIds.length === 0) return reply.code(404).send({ error: "admin_disabled" });
+    const [scheme, value = ""] = (req.headers.authorization ?? "").split(" ", 2);
+    if (scheme === "Bearer") {
+      if (!token || !tokenMatches(value, token)) return reply.code(401).send({ error: "unauthorized" });
+      return;
+    }
+    // Без заголовка пускает только DEV_AUTH_BYPASS (тестовый игрок при локальной разработке)
+    const user = resolveTelegramUser(scheme === "tma" ? value : undefined);
+    if ("error" in user) return reply.code(401).send({ error: "unauthorized" });
+    if (!adminIds.includes(user.id)) return reply.code(403).send({ error: "forbidden" });
   });
 
   app.setErrorHandler((err, _req, reply) => {

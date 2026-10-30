@@ -48,6 +48,7 @@ const app = await buildApp({
   channels,
   corsOrigins: config.corsOrigins,
   adminToken: config.adminToken,
+  adminIds: config.adminIds,
 });
 await app.listen({ port: config.port, host: "0.0.0.0" });
 

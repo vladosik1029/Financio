@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-export function PlaceholderScreen({ section }: { section: "career" | "rating" }) {
+export function PlaceholderScreen({ section }: { section: "rating" }) {
   const { t } = useTranslation();
   return (
     <div className="screen placeholder">

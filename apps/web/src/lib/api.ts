@@ -1,6 +1,7 @@
 import type {
   Candle,
   Coin,
+  GameSettings,
   OpenPositionRequest,
   Position,
   Profile,
@@ -47,6 +48,39 @@ const get = <T>(path: string) => request<T>("GET", path);
 export interface Me {
   user: { id: number; first_name: string; username?: string; language_code?: string };
   profile: Profile;
+  isAdmin?: boolean;
+}
+
+export interface AdminStats {
+  users: number;
+  activeToday: number;
+  totalBalance: number;
+  openPositions: number;
+  openMargin: number;
+  feed: string;
+  stale: boolean;
+}
+
+export interface AdminUser {
+  id: number;
+  firstName: string;
+  username: string | null;
+  balance: number;
+  level: number;
+  xp: number;
+  banned: boolean;
+  createdAt: string;
+  lastSeenAt: string;
+}
+
+export interface LedgerEntry {
+  id: number;
+  type: string;
+  amount: number;
+  balanceAfter: number;
+  positionId: number | null;
+  note: string | null;
+  createdAt: string;
 }
 
 export const api = {
@@ -63,4 +97,18 @@ export const api = {
   addMargin: (id: number, amount: number) =>
     request<{ position: Position }>("POST", `/positions/${id}/margin`, { amount }),
   loan: () => request<{ balance: number }>("POST", "/loan"),
+};
+
+/** Админка из MiniApp: сервер пускает по Telegram ID из ADMIN_TELEGRAM_IDS */
+export const adminApi = {
+  stats: () => get<AdminStats>("/admin/stats"),
+  users: (q: string) => get<{ users: AdminUser[] }>(`/admin/users?limit=100${q ? `&q=${encodeURIComponent(q)}` : ""}`),
+  user: (id: number) =>
+    get<{ user: AdminUser; open: Position[]; history: Position[]; ledger: LedgerEntry[] }>(`/admin/users/${id}`),
+  adjustBalance: (id: number, amount: number, note: string) =>
+    request<{ balance: number }>("POST", `/admin/users/${id}/balance`, { amount, note }),
+  ban: (id: number, banned: boolean) => request<{ user: AdminUser }>("POST", `/admin/users/${id}/ban`, { banned }),
+  closePosition: (id: number) => request<{ position: Position }>("POST", `/admin/positions/${id}/close`),
+  settings: () => get<{ settings: GameSettings }>("/admin/settings"),
+  saveSettings: (patch: Partial<GameSettings>) => request<{ settings: GameSettings }>("PUT", "/admin/settings", patch),
 };
