@@ -1297,3 +1297,51 @@ h3 {
 .rarity-legendary {
   --rarity: #ffc23d;
 }
+/* Анимации приколюх: пар, свечение, хвост кота, огоньки фермы, пламя ракеты */
+.trader-scene [id="steam"] {
+  animation: scene-steam 2.4s ease-in-out infinite;
+}
+.trader-scene [id="glow"] {
+  animation: scene-screen 2s ease-in-out infinite;
+}
+.trader-scene [id="tail"] {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: scene-tail 3s ease-in-out infinite;
+}
+.trader-scene [id="leds"] {
+  animation: scene-leds 0.8s steps(2) infinite;
+}
+.trader-scene [id="flame"] {
+  transform-box: fill-box;
+  transform-origin: center top;
+  animation: scene-flame 0.3s ease-in-out infinite alternate;
+}
+@keyframes scene-steam {
+  0% {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes scene-tail {
+  50% {
+    transform: rotate(8deg);
+  }
+}
+@keyframes scene-leds {
+  50% {
+    opacity: 0.4;
+  }
+}
+@keyframes scene-flame {
+  to {
+    transform: scaleY(1.2);
+  }
+}
