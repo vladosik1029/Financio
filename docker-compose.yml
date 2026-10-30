@@ -26,6 +26,9 @@ services:
       DEV_AUTH_BYPASS: "false"
     expose:
       - "8080"
+    volumes:
+      # Встроенная база PGlite (если DATABASE_URL не указывает на PostgreSQL)
+      - server_data:/app/apps/server/data
     restart: unless-stopped
 
   bot:
@@ -36,7 +39,8 @@ services:
     restart: unless-stopped
     profiles: ["bot"]
 
-  # База и кэш понадобятся с этапа 2 (позиции, балансы, рейтинги)
+  # Отдельный PostgreSQL: нужен, когда встроенной базы станет мало.
+  # Запуск: docker compose --profile db up -d, затем DATABASE_URL=postgres://financio:financio@postgres:5432/financio
   postgres:
     image: postgres:17-alpine
     environment:
@@ -48,12 +52,9 @@ services:
     restart: unless-stopped
     profiles: ["db"]
 
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    profiles: ["db"]
 
 volumes:
   caddy_data:
   caddy_config:
+  server_data:
   pgdata:

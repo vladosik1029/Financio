@@ -1,6 +1,8 @@
 import { getCoin, getTimeframe, type ClientMessage, type ServerMessage } from "@financio/shared";
 import type { FastifyInstance } from "fastify";
 import type { WebSocket } from "ws";
+import { resolveTelegramUser } from "../auth/plugin.js";
+import type { UserChannels } from "../channels.js";
 import type { MarketHub } from "../market/hub.js";
 
 /** Как часто рассылать тикеры всем клиентам */
@@ -14,9 +16,15 @@ interface Client {
   subs: Set<string>;
 }
 
-/** Публичный поток рыночных данных: тикеры всех монет и свечи по подписке */
-export async function wsRoutes(app: FastifyInstance, opts: { hub: MarketHub }): Promise<void> {
-  const { hub } = opts;
+/**
+ * Поток рыночных данных: тикеры всех монет и свечи по подписке.
+ * С initData в параметре `auth` по тому же соединению приходят личные события игрока.
+ */
+export async function wsRoutes(
+  app: FastifyInstance,
+  opts: { hub: MarketHub; channels: UserChannels },
+): Promise<void> {
+  const { hub, channels } = opts;
   const clients = new Set<Client>();
   const pending = new Map<string, ServerMessage>();
 
@@ -46,9 +54,13 @@ export async function wsRoutes(app: FastifyInstance, opts: { hub: MarketHub }): 
     clearInterval(tickerTimer);
   });
 
-  app.get("/ws", { websocket: true }, (socket) => {
+  app.get("/ws", { websocket: true }, (socket, req) => {
     const client: Client = { socket, subs: new Set() };
     clients.add(client);
+    const auth = (req.query as { auth?: string }).auth;
+    const user = resolveTelegramUser(auth);
+    const userId = "error" in user ? undefined : user.id;
+    if (userId !== undefined) channels.add(userId, socket);
     send(socket, { type: "tickers", tickers: hub.getTickers(), stale: hub.stale });
 
     socket.on("message", (raw) => {
@@ -71,6 +83,9 @@ export async function wsRoutes(app: FastifyInstance, opts: { hub: MarketHub }): 
       client.subs.add(key);
     });
 
-    socket.on("close", () => clients.delete(client));
+    socket.on("close", () => {
+      clients.delete(client);
+      if (userId !== undefined) channels.remove(userId, socket);
+    });
   });
 }

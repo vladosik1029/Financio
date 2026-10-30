@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>iZZi Financio — админка</title>
+<style>
+  :root { --bg:#0b0e14; --surface:#121722; --border:#1f2633; --text:#e6e9f0; --muted:#8b93a7; --up:#16c784; --down:#ea3943; --gold:#f5b942; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 Inter, system-ui, sans-serif; }
+  header { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1px solid var(--border); }
+  h1 { font-size:18px; margin:0; } h1 span { color:var(--gold); }
+  h2 { font-size:15px; margin:0 0 12px; }
+  main { padding:20px; display:grid; gap:20px; max-width:1200px; margin:0 auto; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .stat b { display:block; font-size:20px; font-family:ui-monospace, monospace; }
+  .muted { color:var(--muted); } .up { color:var(--up); } .down { color:var(--down); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  input, select { background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font:inherit; }
+  button { background:var(--gold); color:#1a1204; border:0; border-radius:8px; padding:8px 14px; font:inherit; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--border); }
+  button.danger { background:var(--down); color:#fff; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  th { color:var(--muted); font-weight:500; }
+  td.num { font-family:ui-monospace, monospace; text-align:right; }
+  tr.click { cursor:pointer; } tr.click:hover { background:#161c29; }
+  .scroll { overflow-x:auto; }
+  .settings { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+  .settings label { display:flex; flex-direction:column; gap:4px; color:var(--muted); }
+  #login { max-width:380px; margin:15vh auto; }
+  .hidden { display:none !important; }
+  #toast { position:fixed; bottom:20px; right:20px; padding:10px 14px; border-radius:8px; background:var(--surface); border:1px solid var(--gold); }
+</style>
+</head>
+<body>
+<div id="login" class="card">
+  <h2>Вход в админку</h2>
+  <p class="muted">Введите ADMIN_TOKEN из файла .env на сервере.</p>
+  <form class="row" onsubmit="login(event)">
+    <input id="token" type="password" placeholder="ADMIN_TOKEN" style="flex:1" autocomplete="current-password" />
+    <button>Войти</button>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <h1>iZZi <span>Financio</span> · админка</h1>
+    <button class="ghost" onclick="logout()">Выйти</button>
+  </header>
+  <main>
+    <section class="card"><h2>Сводка</h2><div class="stats" id="stats"></div></section>
+
+    <section class="card">
+      <h2>Настройки игры</h2>
+      <form id="settings" class="settings" onsubmit="saveSettings(event)"></form>
+    </section>
+
+    <section class="card">
+      <h2>Игроки</h2>
+      <form class="row" onsubmit="loadUsers(event)" style="margin-bottom:12px">
+        <input id="q" placeholder="Имя, @username или Telegram ID" style="flex:1" />
+        <button>Найти</button>
+      </form>
+      <div class="scroll"><table id="users"></table></div>
+    </section>
+
+    <section class="card hidden" id="user"></section>
+  </main>
+</div>
+<div id="toast" class="hidden"></div>
+
+<script>
+const SETTINGS = {
+  tradingEnabled: ["Торговля включена", "bool"],
+  takerFeeRate: ["Комиссия taker (доля, 0.0005 = 0,05%)", "num"],
+  startingBalance: ["Стартовый баланс, $", "num"],
+  maxOpenPositions: ["Макс. открытых позиций", "int"],
+  loanAmount: ["Кредит наставника, $", "num"],
+  loanThreshold: ["Банкротство: баланс ниже, $", "num"],
+  loanCooldownHours: ["Кредит не чаще, часов", "num"],
+};
+let token = sessionStorage.getItem("adminToken") || "";
+
+const $ = (id) => document.getElementById(id);
+const usd = (n) => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const dt = (v) => (v ? new Date(v).toLocaleString("ru-RU") : "—");
+
+function toast(text) {
+  const el = $("toast");
+  el.textContent = text;
+  el.classList.remove("hidden");
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => el.classList.add("hidden"), 3000);
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch("/api/admin" + path, {
+    ...opts,
+    headers: { Authorization: "Bearer " + token, ...(opts.body ? { "Content-Type": "application/json" } : {}) },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 401) { logout(); throw new Error("Неверный токен"); }
+  if (!res.ok) throw new Error(body.error || res.statusText);
+  return body;
+}
+
+function login(e) {
+  e.preventDefault();
+  token = $("token").value.trim();
+  sessionStorage.setItem("adminToken", token);
+  start();
+}
+function logout() {
+  token = "";
+  sessionStorage.removeItem("adminToken");
+  $("app").classList.add("hidden");
+  $("login").classList.remove("hidden");
+}
+
+async function start() {
+  if (!token) return;
+  try {
+    await loadStats();
+    $("login").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    await Promise.all([loadSettings(), loadUsers()]);
+  } catch (err) { toast(err.message); }
+}
+
+async function loadStats() {
+  const s = await api("/stats");
+  $("stats").innerHTML = [
+    ["Игроков", s.users], ["Активны за сутки", s.activeToday], ["Деньги на балансах", usd(s.totalBalance)],
+    ["Открытых позиций", s.openPositions], ["Маржа в позициях", usd(s.openMargin)],
+    ["Цены", `${s.feed} · ${s.stale ? '<span class="down">устарели</span>' : '<span class="up">живые</span>'}`],
+  ].map(([k, v]) => `<div class="stat"><span class="muted">${k}</span><b>${v}</b></div>`).join("");
+}
+
+async function loadSettings() {
+  const { settings } = await api("/settings");
+  $("settings").innerHTML = Object.entries(SETTINGS).map(([key, [label, type]]) =>
+    type === "bool"
+      ? `<label>${label}<select name="${key}"><option value="true" ${settings[key] ? "selected" : ""}>Да</option><option value="false" ${settings[key] ? "" : "selected"}>Нет</option></select></label>`
+      : `<label>${label}<input name="${key}" type="number" step="any" value="${settings[key]}" /></label>`
+  ).join("") + `<div style="align-self:end"><button>Сохранить</button></div>`;
+}
+
+async function saveSettings(e) {
+  e.preventDefault();
+  const form = new FormData(e.target);
+  const patch = {};
+  for (const [key, [, type]] of Object.entries(SETTINGS)) {
+    const v = form.get(key);
+    patch[key] = type === "bool" ? v === "true" : Number(v);
+  }
+  try { await api("/settings", { method: "PUT", body: JSON.stringify(patch) }); toast("Настройки сохранены"); }
+  catch (err) { toast("Ошибка: " + err.message); }
+}
+
+async function loadUsers(e) {
+  e?.preventDefault();
+  const q = $("q").value.trim();
+  const { users } = await api("/users?limit=100" + (q ? "&q=" + encodeURIComponent(q) : ""));
+  $("users").innerHTML = `<tr><th>ID</th><th>Имя</th><th>Username</th><th>Ур.</th><th style="text-align:right">Баланс</th><th>Был</th><th></th></tr>` +
+    users.map((u) => `<tr class="click" onclick="openUser(${u.id})"><td>${u.id}</td><td>${esc(u.firstName)}</td><td>${u.username ? "@" + esc(u.username) : ""}</td><td>${u.level}</td><td class="num">${usd(u.balance)}</td><td>${dt(u.lastSeenAt)}</td><td>${u.banned ? '<span class="down">бан</span>' : ""}</td></tr>`).join("");
+}
+
+function positionRows(list, withClose) {
+  if (!list.length) return '<p class="muted">Нет</p>';
+  return `<div class="scroll"><table><tr><th>#</th><th>Монета</th><th>Сторона</th><th>Плечо</th><th style="text-align:right">Маржа</th><th style="text-align:right">Вход</th><th style="text-align:right">Выход</th><th style="text-align:right">PnL</th><th>Причина</th><th>Открыта</th><th></th></tr>` +
+    list.map((p) => `<tr><td>${p.id}</td><td>${p.symbol}</td><td class="${p.side === "long" ? "up" : "down"}">${p.side}</td><td>${p.leverage}x</td><td class="num">${usd(p.invested)}</td><td class="num">${p.entryPrice.toPrecision(7)}</td><td class="num">${p.exitPrice ? p.exitPrice.toPrecision(7) : "—"}</td><td class="num ${p.realizedPnl > 0 ? "up" : "down"}">${p.realizedPnl == null ? "—" : usd(p.realizedPnl)}</td><td>${p.closeReason || ""}</td><td>${dt(p.openedAt)}</td><td>${withClose ? `<button class="danger" onclick="closePos(${p.id}, ${p.id})">Закрыть</button>` : ""}</td></tr>`).join("") + `</table></div>`;
+}
+
+async function openUser(id) {
+  const d = await api("/users/" + id);
+  const u = d.user;
+  const el = $("user");
+  el.classList.remove("hidden");
+  el.innerHTML = `
+    <div class="row" style="justify-content:space-between">
+      <h2>${esc(u.firstName)} ${u.username ? "@" + esc(u.username) : ""} · ID ${u.id}</h2>
+      <button class="${u.banned ? "ghost" : "danger"}" onclick="ban(${u.id}, ${!u.banned})">${u.banned ? "Разбанить" : "Забанить"}</button>
+    </div>
+    <p>Баланс <b>${usd(u.balance)}</b> · уровень ${u.level} · XP ${u.xp} · с нами с ${dt(u.createdAt)}</p>
+    <form class="row" onsubmit="adjust(event, ${u.id})">
+      <input name="amount" type="number" step="any" placeholder="Сумма (+ или −)" required />
+      <input name="note" placeholder="Причина" required style="flex:1" />
+      <button>Изменить баланс</button>
+    </form>
+    <h2 style="margin-top:18px">Открытые позиции</h2>${positionRows(d.open, true)}
+    <h2 style="margin-top:18px">История</h2>${positionRows(d.history, false)}
+    <h2 style="margin-top:18px">Журнал операций</h2>
+    <div class="scroll"><table><tr><th>Когда</th><th>Тип</th><th style="text-align:right">Сумма</th><th style="text-align:right">Баланс после</th><th>Позиция</th><th>Заметка</th></tr>
+    ${d.ledger.map((l) => `<tr><td>${dt(l.createdAt)}</td><td>${l.type}</td><td class="num ${l.amount >= 0 ? "up" : "down"}">${usd(l.amount)}</td><td class="num">${usd(l.balanceAfter)}</td><td>${l.positionId ?? ""}</td><td>${esc(l.note)}</td></tr>`).join("")}</table></div>`;
+  el.scrollIntoView({ behavior: "smooth" });
+  el.dataset.user = id;
+}
+
+async function adjust(e, id) {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  try {
+    await api(`/users/${id}/balance`, { method: "POST", body: JSON.stringify({ amount: Number(f.get("amount")), note: f.get("note") }) });
+    toast("Баланс изменён");
+    await Promise.all([openUser(id), loadUsers(), loadStats()]);
+  } catch (err) { toast("Ошибка: " + err.message); }
+}
+
+async function ban(id, banned) {
+  if (!confirm(banned ? "Забанить игрока? Он не сможет торговать." : "Разбанить игрока?")) return;
+  await api(`/users/${id}/ban`, { method: "POST", body: JSON.stringify({ banned }) });
+  await Promise.all([openUser(id), loadUsers()]);
+}
+
+async function closePos(id) {
+  if (!confirm("Закрыть позицию #" + id + " по рынку?")) return;
+  try {
+    await api(`/positions/${id}/close`, { method: "POST" });
+    toast("Позиция закрыта");
+    await Promise.all([openUser(Number($("user").dataset.user)), loadStats()]);
+  } catch (err) { toast("Ошибка: " + err.message); }
+}
+
+start();
+setInterval(() => { if (token) loadStats().catch(() => {}); }, 15000);
+</script>
+</body>
+</html>

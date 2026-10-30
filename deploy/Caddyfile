@@ -5,6 +5,10 @@
 		reverse_proxy server:8080
 	}
 
+	handle /admin {
+		reverse_proxy server:8080
+	}
+
 	handle /ws {
 		reverse_proxy server:8080
 	}

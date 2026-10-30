@@ -13,6 +13,7 @@ export class MarketHub {
   private readonly tickers = new Map<string, Ticker>();
   private readonly historyLoadedAt = new Map<string, number>();
   private lastDataAt = 0;
+  private readonly markListeners = new Set<(symbol: string, mark: number) => void>();
 
   constructor(
     private readonly feed: PriceFeed,
@@ -36,6 +37,7 @@ export class MarketHub {
         t.fundingRate = fundingRate;
         t.nextFundingTime = nextFundingTime;
         t.updatedAt = Math.max(t.updatedAt, ts);
+        for (const l of this.markListeners) l(symbol, mark);
       },
     });
   }
@@ -58,6 +60,12 @@ export class MarketHub {
 
   getTicker(symbol: string): Ticker | undefined {
     return this.tickers.get(symbol);
+  }
+
+  /** Подписка на каждое обновление mark price: по нему движок проверяет ликвидации и TP/SL */
+  onMark(listener: (symbol: string, mark: number) => void): () => void {
+    this.markListeners.add(listener);
+    return () => this.markListeners.delete(listener);
   }
 
   onCandle(listener: CandleListener): () => void {

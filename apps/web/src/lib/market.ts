@@ -1,6 +1,8 @@
 import type { Candle, ServerMessage, Ticker, TimeframeId } from "@financio/shared";
 import { create } from "zustand";
 import { WS_URL } from "./api";
+import { useApp } from "./store";
+import { haptic } from "./telegram";
 
 interface MarketState {
   tickers: Record<string, Ticker>;
@@ -25,6 +27,8 @@ class MarketSocket {
       this.retryMs = 1000;
       useMarket.setState({ connected: true });
       for (const key of this.listeners.keys()) this.sendSubscribe("subscribe", key);
+      // Пока соединения не было, позиции могли закрыться: подтягиваем актуальное состояние
+      void useApp.getState().refresh();
     };
     ws.onmessage = (e) => this.handle(JSON.parse(e.data as string) as ServerMessage);
     ws.onclose = () => {
@@ -60,12 +64,24 @@ class MarketSocket {
   }
 
   private handle(msg: ServerMessage): void {
-    if (msg.type === "tickers") {
-      const tickers: Record<string, Ticker> = {};
-      for (const t of msg.tickers) tickers[t.symbol] = t;
-      useMarket.setState({ tickers, stale: msg.stale });
-    } else if (msg.type === "candle") {
-      this.listeners.get(`${msg.symbol}:${msg.tf}`)?.forEach((l) => l(msg.candle));
+    switch (msg.type) {
+      case "tickers": {
+        const tickers: Record<string, Ticker> = {};
+        for (const t of msg.tickers) tickers[t.symbol] = t;
+        useMarket.setState({ tickers, stale: msg.stale });
+        break;
+      }
+      case "candle":
+        this.listeners.get(`${msg.symbol}:${msg.tf}`)?.forEach((l) => l(msg.candle));
+        break;
+      case "position":
+        useApp.getState().applyPosition(msg.event, msg.position);
+        if (msg.event === "closed" && msg.position.closeReason === "liquidation") haptic.error();
+        else if (msg.event === "closed" && msg.position.closeReason !== "manual") haptic.warning();
+        break;
+      case "balance":
+        useApp.getState().setBalance(msg.balance);
+        break;
     }
   }
 }

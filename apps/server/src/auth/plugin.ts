@@ -8,28 +8,24 @@ declare module "fastify" {
   }
 }
 
-const DEV_USER: TelegramUser = { id: 1, first_name: "Dev", username: "dev", language_code: "ru" };
+export const DEV_USER: TelegramUser = { id: 1, first_name: "Dev", username: "dev", language_code: "ru" };
 
 /**
- * Проверяет заголовок `Authorization: tma <initData>`.
- * В режиме DEV_AUTH_BYPASS без заголовка подставляется тестовый игрок.
+ * Игрок по initData: из заголовка `Authorization: tma <initData>` или из строки запроса WebSocket.
+ * В режиме DEV_AUTH_BYPASS без initData подставляется тестовый игрок.
  */
-export async function requireTelegramUser(req: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const header = req.headers.authorization ?? "";
-  const [scheme, initData] = header.split(" ", 2);
-
-  if (scheme === "tma" && initData && config.botToken) {
+export function resolveTelegramUser(initData: string | undefined): TelegramUser | { error: string } {
+  if (initData && config.botToken) {
     const res = validateInitData(initData, config.botToken);
-    if (res.ok) {
-      req.tgUser = res.user;
-      return;
-    }
-    return reply.code(401).send({ error: res.reason });
+    return res.ok ? res.user : { error: res.reason };
   }
+  if (config.devAuthBypass) return DEV_USER;
+  return { error: "unauthorized" };
+}
 
-  if (config.devAuthBypass) {
-    req.tgUser = DEV_USER;
-    return;
-  }
-  return reply.code(401).send({ error: "unauthorized" });
+export async function requireTelegramUser(req: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const [scheme, initData] = (req.headers.authorization ?? "").split(" ", 2);
+  const user = resolveTelegramUser(scheme === "tma" ? initData : undefined);
+  if ("error" in user) return reply.code(401).send({ error: user.error });
+  req.tgUser = user;
 }

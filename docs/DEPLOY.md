@@ -50,7 +50,10 @@ WEBAPP_URL=https://fin.izzinet.xyz
 CORS_ORIGINS=https://fin.izzinet.xyz
 PRICE_FEED=binance
 DEV_AUTH_BYPASS=false
+ADMIN_TOKEN=<openssl rand -hex 24>
 ```
+
+Игроки и сделки хранятся во встроенной базе в Docker-томе `server_data`, он переживает перезапуски и обновления. Резервная копия: `docker compose stop server`, затем `docker run --rm -v financio_server_data:/data -v $PWD:/backup alpine tar czf /backup/financio-db.tgz /data`, затем `docker compose start server`.
 
 ## 4. Запуск
 
@@ -66,7 +69,7 @@ curl https://fin.izzinet.xyz/api/health        # {"ok":true,"feed":"binance","st
 docker compose logs -f server                  # строка «Binance: подключено»
 ```
 
-Откройте `https://fin.izzinet.xyz` в браузере: должен появиться терминал с живым графиком.
+Откройте `https://fin.izzinet.xyz` в браузере: должен появиться терминал с живым графиком. Админка открывается по адресу `https://fin.izzinet.xyz/admin`, пароль — `ADMIN_TOKEN`.
 
 ## 5. Telegram
 
