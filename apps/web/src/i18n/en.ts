@@ -168,8 +168,18 @@ export const en: Messages = {
   },
   quests: {
     trades: "Make 3 trades",
-    profit: "Close a trade in profit",
+    trades5: "Make 5 trades",
+    volume: "Trade $10,000 in volume",
     stopLoss: "Open a trade with a Stop Loss",
+    takeProfit: "Open a trade with a Take Profit",
+    limitFill: "Enter a trade with a limit order",
+    coins: "Trade two different coins",
+    longShort: "Open both a long and a short",
+    profit: "Close a trade in profit",
+    profit3: "Close 3 trades in profit",
+    takeProfitHit: "Let a Take Profit trigger",
+    hold: "Hold a trade for 5 minutes, then close it",
+    pnl: "Make $25 in a day",
   },
   admin: {
     summary: "Summary",
@@ -281,5 +291,5 @@ export const en: Messages = {
     title: "Coming soon",
     rating: "Leaderboards and tournaments will live here.",
   },
-  profile: { language: "Language", id: "Telegram ID", disclaimer: "All money in the game is virtual. This is not financial advice." },
+  profile: { upgrade: "Upgrade workspace", language: "Language", id: "Telegram ID", disclaimer: "All money in the game is virtual. This is not financial advice." },
 };

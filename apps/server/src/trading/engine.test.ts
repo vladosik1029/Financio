@@ -1,4 +1,4 @@
-import type { ServerMessage, Ticker } from "@financio/shared";
+import { dailyQuests, type ServerMessage, type Ticker } from "@financio/shared";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { openDatabase, type Database } from "../db/index.js";
@@ -238,8 +238,15 @@ describe("TradingEngine", () => {
 
   describe("опыт и квесты", () => {
     const profile = () => engine.getProfile(USER.id);
+    /** Ближайшие сутки (в то же время дня), в которые выпадают нужные квесты */
+    const dayWith = (from: number, ...ids: string[]) => {
+      let day = from;
+      while (!ids.every((id) => dailyQuests(day).some((q) => q.id === id))) day += 24 * HOUR;
+      return day;
+    };
 
     it("прибыльная сделка даёт опыт, слишком короткая — нет", async () => {
+      now = dayWith(now, "profit");
       const quick = await open();
       market.set("BTCUSDT", 51_000);
       await engine.closePosition(USER.id, quick.id);
@@ -258,6 +265,7 @@ describe("TradingEngine", () => {
     });
 
     it("квесты дня награждают один раз, новый уровень даёт бонус на баланс", async () => {
+      now = dayWith(now, "trades", "stopLoss");
       for (let i = 0; i < 3; i++) await open({ stopLoss: 49_000 });
       // «3 сделки» (30) + «со стоп-лоссом» (30)
       await vi.waitFor(async () => expect((await profile()).xp).toBe(60));
@@ -268,7 +276,7 @@ describe("TradingEngine", () => {
       expect(p.quests.filter((q) => q.done).map((q) => q.id)).toEqual(["trades", "stopLoss"]);
 
       // Следующие сутки: квесты заново
-      now += 24 * HOUR;
+      now = dayWith(now + 24 * HOUR, "trades", "stopLoss");
       expect((await profile()).quests.every((q) => !q.done)).toBe(true);
       const before = (await profile()).balance;
       for (let i = 0; i < 3; i++) await open({ stopLoss: 49_000 });
@@ -276,6 +284,14 @@ describe("TradingEngine", () => {
       await vi.waitFor(async () => expect((await profile()).level).toBe(2));
       expect((await profile()).xp).toBe(20);
       expect((await profile()).balance).toBeCloseTo(before - 3 * 100.5 + 100);
+    });
+
+    it("квесты сменяются: в другой день засчитываются другие действия", async () => {
+      now = dayWith(now, "longShort");
+      await open();
+      expect((await profile()).quests.find((q) => q.id === "longShort")?.progress).toBe(1);
+      await open({ side: "short" });
+      await vi.waitFor(async () => expect((await profile()).quests.find((q) => q.id === "longShort")?.done).toBe(true));
     });
   });
 

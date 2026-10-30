@@ -166,8 +166,18 @@ export const ru = {
   },
   quests: {
     trades: "Соверши 3 сделки",
-    profit: "Закрой сделку в плюс",
+    trades5: "Соверши 5 сделок",
+    volume: "Наторгуй объём на $10 000",
     stopLoss: "Открой сделку со Stop Loss",
+    takeProfit: "Открой сделку с Take Profit",
+    limitFill: "Войди в сделку лимитным ордером",
+    coins: "Поторгуй двумя разными монетами",
+    longShort: "Открой и лонг, и шорт",
+    profit: "Закрой сделку в плюс",
+    profit3: "Закрой 3 сделки в плюс",
+    takeProfitHit: "Дождись срабатывания Take Profit",
+    hold: "Продержи сделку 5 минут и закрой",
+    pnl: "Заработай за день $25",
   },
   admin: {
     summary: "Сводка",
@@ -279,7 +289,7 @@ export const ru = {
     title: "Скоро",
     rating: "Здесь будут рейтинги и турниры.",
   },
-  profile: { language: "Язык", id: "Telegram ID", disclaimer: "Все деньги в игре виртуальные. Это не финансовый совет." },
+  profile: { upgrade: "Улучшить рабочее место", language: "Язык", id: "Telegram ID", disclaimer: "Все деньги в игре виртуальные. Это не финансовый совет." },
 };
 
 export type Messages = typeof ru;
