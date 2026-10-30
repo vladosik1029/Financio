@@ -1,12 +1,13 @@
 import { useEffect } from "react";
 import { AlertOverlay } from "./components/AlertOverlay";
 import { GlobalToast } from "./components/GlobalToast";
+import { LevelUpOverlay } from "./components/LevelUpOverlay";
 import { TabBar } from "./components/TabBar";
 import { useApp } from "./lib/store";
 import { tg } from "./lib/telegram";
 import { AdminScreen } from "./screens/AdminScreen";
 import { HomeScreen } from "./screens/HomeScreen";
-import { PlaceholderScreen } from "./screens/PlaceholderScreen";
+import { CareerScreen } from "./screens/CareerScreen";
 import { PortfolioScreen } from "./screens/PortfolioScreen";
 import { ProfileScreen } from "./screens/ProfileScreen";
 import { TradeScreen } from "./screens/TradeScreen";
@@ -27,13 +28,14 @@ export function App() {
         {tab === "home" && <HomeScreen />}
         {tab === "trade" && <TradeScreen />}
         {tab === "portfolio" && <PortfolioScreen />}
-        {tab === "rating" && <PlaceholderScreen section="rating" />}
+        {tab === "career" && <CareerScreen />}
         {tab === "profile" && <ProfileScreen />}
         {tab === "admin" && isAdmin && <AdminScreen />}
       </main>
       <TabBar />
       <GlobalToast />
       <AlertOverlay />
+      <LevelUpOverlay />
     </div>
   );
 }

@@ -3,6 +3,8 @@ const PATHS = {
   home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z",
   trade: "M4 19V5M4 19h16M8 15l3-4 3 2 5-6",
   portfolio: "M4 7h16v12H4zM9 7V5h6v2M4 12h16",
+  career: "M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z",
+  plus: "M12 5v14M5 12h14",
   rating: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3",
   profile: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",
   chevron: "M6 9l6 6 6-6",

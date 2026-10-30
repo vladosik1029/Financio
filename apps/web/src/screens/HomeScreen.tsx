@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "../components/Icon";
 import { Logo } from "../components/Logo";
 import { LoanBanner } from "../components/LoanBanner";
-import { accountSummary, dailyQuests, rankKey, tradeStats } from "../lib/game";
+import { MentorCard } from "../components/MentorCard";
+import { accountSummary, rankKey, tradeStats, untilQuestReset } from "../lib/game";
 import { formatSigned, formatUsd } from "../lib/format";
 import { useMarket } from "../lib/market";
 import { useApp } from "../lib/store";
@@ -22,7 +23,6 @@ export function HomeScreen() {
 
   const account = accountSummary(profile.balance, open, tickers);
   const stats = tradeStats(history);
-  const quests = dailyQuests(open, history);
   const xpPct = Math.min(100, (profile.xp / profile.xpToNext) * 100);
 
   const goTrade = (symbol?: string) => {
@@ -79,14 +79,15 @@ export function HomeScreen() {
       </section>
 
       <LoanBanner />
+      <MentorCard />
 
       <div className="section-head">
         <h3>{t("home.quests")}</h3>
-        <span className="muted small">{t("home.questsReset")}</span>
+        <span className="muted small">{t("home.questsReset", { time: untilQuestReset() })}</span>
       </div>
       <section className="card quests">
-        {quests.map((q) => {
-          const done = q.progress >= q.goal;
+        {profile.quests.map((q) => {
+          const done = q.done;
           return (
             <div key={q.id} className={done ? "quest done" : "quest"}>
               <span className="quest-mark">{done && <Icon name="check" size={14} />}</span>
@@ -96,13 +97,15 @@ export function HomeScreen() {
                   <div style={{ width: `${(q.progress / q.goal) * 100}%` }} />
                 </div>
               </div>
-              <span className="mono small muted">
-                {q.progress}/{q.goal}
+              <span className="quest-reward">
+                <span className="mono small">+{q.xp} XP</span>
+                <span className="mono small muted">
+                  {q.progress}/{q.goal}
+                </span>
               </span>
             </div>
           );
         })}
-        <div className="muted small">{t("home.questsNote")}</div>
       </section>
 
       <h3>{t("home.stats")}</h3>

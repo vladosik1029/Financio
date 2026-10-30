@@ -6,6 +6,7 @@ import type {
   Order,
   Position,
   Profile,
+  RpgState,
   Ticker,
   Timeframe,
   TimeframeId,
@@ -101,6 +102,11 @@ export const api = {
   orders: (scope: "pending" | "history") => get<{ orders: Order[] }>(`/orders?scope=${scope}&limit=100`),
   placeOrder: (req: OpenPositionRequest) => request<{ order: Order }>("POST", "/orders", req),
   cancelOrder: (id: number) => request<{ order: Order }>("POST", `/orders/${id}/cancel`),
+  rpg: () => get<{ rpg: RpgState }>("/rpg"),
+  buyItem: (id: string) => request<{ rpg: RpgState }>("POST", `/shop/${id}/buy`),
+  equip: (id: string) => request<{ rpg: RpgState }>("POST", `/items/${id}/equip`),
+  unequip: (id: string) => request<{ rpg: RpgState }>("POST", `/items/${id}/unequip`),
+  upgradeSkill: (id: string) => request<{ rpg: RpgState }>("POST", `/skills/${id}/upgrade`),
 };
 
 /** Админка из MiniApp: сервер пускает по Telegram ID из ADMIN_TELEGRAM_IDS */

@@ -122,6 +122,32 @@ export async function tradeRoutes(
     return { order: await engine.cancelOrder(req.tgUser!.id, id) };
   });
 
+  // ---------- Экипировка и навыки ----------
+
+  const itemParams = z.object({ id: z.string().min(1).max(64) });
+
+  app.get("/rpg", { preHandler: player }, async (req) => ({ rpg: await engine.rpg.state(req.tgUser!.id) }));
+
+  app.post("/shop/:id/buy", { preHandler: guard }, async (req) => {
+    const { id } = itemParams.parse(req.params);
+    return { rpg: await engine.rpg.buy(req.tgUser!.id, id) };
+  });
+
+  app.post("/items/:id/equip", { preHandler: guard }, async (req) => {
+    const { id } = itemParams.parse(req.params);
+    return { rpg: await engine.rpg.equip(req.tgUser!.id, id) };
+  });
+
+  app.post("/items/:id/unequip", { preHandler: guard }, async (req) => {
+    const { id } = itemParams.parse(req.params);
+    return { rpg: await engine.rpg.unequip(req.tgUser!.id, id) };
+  });
+
+  app.post("/skills/:id/upgrade", { preHandler: guard }, async (req) => {
+    const { id } = itemParams.parse(req.params);
+    return { rpg: await engine.rpg.upgradeSkill(req.tgUser!.id, id) };
+  });
+
   app.post("/loan", { preHandler: guard }, async (req) => {
     return { balance: await engine.takeLoan(req.tgUser!.id) };
   });
