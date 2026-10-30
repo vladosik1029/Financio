@@ -29,6 +29,7 @@ export function PriceChart({ symbol, tf }: { symbol: string; tf: TimeframeId }) 
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const linesRef = useRef<IPriceLine[]>([]);
   const positions = useApp((s) => s.open);
+  const orders = useApp((s) => s.orders);
 
   useEffect(() => {
     const chart = createChart(containerRef.current!, {
@@ -115,11 +116,24 @@ export function PriceChart({ symbol, tf }: { symbol: string; tf: TimeframeId }) 
         );
       };
       add(p.entryPrice, p.side === "long" ? theme.up : theme.down, `${p.side === "long" ? "L" : "S"} ${p.leverage}x`, LineStyle.Solid);
-      add(p.liquidationPrice, theme.brand, "LIQ");
+      add(p.liquidationPrice, theme.gold, "LIQ");
       add(p.takeProfit, theme.up, "TP");
       add(p.stopLoss, theme.down, "SL");
     }
-  }, [positions, symbol]);
+    for (const o of orders) {
+      if (o.symbol !== symbol) continue;
+      linesRef.current.push(
+        series.createPriceLine({
+          price: o.price,
+          color: theme.gold,
+          title: `${o.type === "limit" ? "LMT" : "STP"} ${o.side === "long" ? "L" : "S"}`,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dotted,
+          axisLabelVisible: true,
+        }),
+      );
+    }
+  }, [positions, orders, symbol]);
 
   return <div className="chart" ref={containerRef} />;
 }

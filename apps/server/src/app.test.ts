@@ -95,6 +95,22 @@ describe("API", () => {
     expect(closed.json().position.status).toBe("closed");
   });
 
+  it("выставляет и отменяет лимитный ордер", async () => {
+    const price = (await app.inject({ url: "/api/tickers" })).json().tickers[0].last as number;
+    const placed = await app.inject({
+      method: "POST",
+      url: "/api/orders",
+      headers: tma(13),
+      payload: { symbol: "BTCUSDT", side: "long", type: "limit", price: price * 0.9, margin: 50, leverage: 10 },
+    });
+    expect(placed.statusCode).toBe(200);
+    const id = placed.json().order.id;
+    const list = await app.inject({ url: "/api/orders", headers: tma(13) });
+    expect(list.json().orders.map((o: { id: number }) => o.id)).toEqual([id]);
+    const cancelled = await app.inject({ method: "POST", url: `/api/orders/${id}/cancel`, headers: tma(13) });
+    expect(cancelled.json().order.status).toBe("cancelled");
+  });
+
   it("возвращает код ошибки торговли", async () => {
     const res = await app.inject({
       method: "POST",

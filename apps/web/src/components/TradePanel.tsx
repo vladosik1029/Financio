@@ -1,11 +1,13 @@
 import {
   getCoin,
   liquidationPrice,
+  MAKER_FEE_RATE,
   positionNotional,
   positionQuantity,
+  type OrderType,
   type Side,
 } from "@financio/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import { errorKey, formatPrice, formatUsd } from "../lib/format";
@@ -16,6 +18,7 @@ import { Icon } from "./Icon";
 import { LeverageSheet } from "./LeverageSheet";
 
 const MARGIN_STEPS = [0, 25, 50, 75, 100];
+const ORDER_TYPES: OrderType[] = ["market", "limit", "stop"];
 
 function parsePrice(value: string): number | null {
   const n = Number(value.replace(",", "."));
@@ -30,6 +33,8 @@ export function TradePanel() {
   const stale = useMarket((s) => s.stale || !s.connected);
   const coin = getCoin(symbol)!;
 
+  const [orderType, setOrderType] = useState<OrderType>("market");
+  const [orderPrice, setOrderPrice] = useState("");
   const [margin, setMargin] = useState(100);
   const [leverage, setLeverage] = useState(10);
   const [levOpen, setLevOpen] = useState(false);
@@ -39,11 +44,22 @@ export function TradePanel() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null);
 
+  // При смене монеты или типа ордера подставляем текущую цену как отправную точку
+  const lastPrice = ticker?.last;
+  useEffect(() => {
+    if (orderType !== "market" && lastPrice) setOrderPrice(lastPrice.toFixed(coin.pricePrecision));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderType, symbol]);
+
   const lev = Math.min(Math.max(leverage, profile.minLeverage), profile.maxLeverage);
-  const price = ticker?.last ?? 0;
+  const pending = orderType !== "market";
+  const typedPrice = parsePrice(orderPrice);
+  const price = pending ? (typedPrice ?? 0) : (ticker?.last ?? 0);
   const notional = positionNotional(margin, lev);
   const qty = price ? positionQuantity(margin, lev, price) : 0;
-  const fee = notional * profile.takerFeeRate;
+  // Лимит исполняется как maker, рыночный и стоп — как taker
+  const feeRate = orderType === "limit" ? Math.min(MAKER_FEE_RATE, profile.takerFeeRate) : profile.takerFeeRate;
+  const fee = notional * feeRate;
   const maxMargin = Math.max(0, Math.floor((profile.balance / (1 + lev * profile.takerFeeRate)) * 100) / 100);
   const pct = maxMargin > 0 ? Math.min(100, Math.round((margin / maxMargin) * 100)) : 0;
   const fmt = (v: number) => formatPrice(v, coin.pricePrecision);
@@ -56,17 +72,23 @@ export function TradePanel() {
   const open = async (side: Side) => {
     haptic.impact();
     setBusy(true);
+    const req = {
+      symbol,
+      side,
+      margin,
+      leverage: lev,
+      takeProfit: showProtection ? parsePrice(tp) : null,
+      stopLoss: showProtection ? parsePrice(sl) : null,
+    };
     try {
-      await api.open({
-        symbol,
-        side,
-        margin,
-        leverage: lev,
-        takeProfit: showProtection ? parsePrice(tp) : null,
-        stopLoss: showProtection ? parsePrice(sl) : null,
-      });
+      if (pending) {
+        await api.placeOrder({ ...req, type: orderType, price: typedPrice });
+        flash(t("orders.placed", { type: t(`orders.types.${orderType}`), side: t(`trade.${side}`), coin: coin.base }), false);
+      } else {
+        await api.open(req);
+        flash(t("trade.opened", { side: t(`trade.${side}`), coin: coin.base }), false);
+      }
       haptic.success();
-      flash(t("trade.opened", { side: t(`trade.${side}`), coin: coin.base }), false);
       setTp("");
       setSl("");
     } catch (err) {
@@ -77,10 +99,24 @@ export function TradePanel() {
     }
   };
 
-  const disabled = busy || stale || !online || margin < 1 || margin > maxMargin;
+  const disabled = busy || stale || !online || margin < 1 || margin > maxMargin || (pending && !typedPrice);
 
   return (
     <section className="order">
+      <div className="order-types">
+        {ORDER_TYPES.map((type) => (
+          <button
+            key={type}
+            className={type === orderType ? "otype active" : "otype"}
+            onClick={() => {
+              haptic.tap();
+              setOrderType(type);
+            }}
+          >
+            {t(`orders.types.${type}`)}
+          </button>
+        ))}
+      </div>
       <div className="order-mode">
         <span className="pill">{t("trade.isolated")}</span>
         <button className="pill pill-brand" onClick={() => setLevOpen(true)}>
@@ -90,6 +126,22 @@ export function TradePanel() {
           {t("trade.available")} <span className="mono">{formatUsd(profile.balance)}</span>
         </span>
       </div>
+
+      {pending && (
+        <>
+          <label className="amount">
+            <span className="muted small">{t(orderType === "limit" ? "orders.limitPrice" : "orders.triggerPrice")}</span>
+            <input
+              className="mono"
+              inputMode="decimal"
+              value={orderPrice}
+              onChange={(e) => setOrderPrice(e.target.value)}
+            />
+            <span className="muted">USDT</span>
+          </label>
+          <p className="muted small hint">{t(`orders.hint.${orderType}`)}</p>
+        </>
+      )}
 
       <label className="amount">
         <span className="muted small">{t("trade.margin")}</span>
@@ -153,7 +205,7 @@ export function TradePanel() {
         <dd className="mono">
           {formatUsd(notional)} <span className="muted">≈ {qty.toFixed(4)} {coin.base}</span>
         </dd>
-        <dt>{t("trade.fee")}</dt>
+        <dt>{t(orderType === "limit" ? "trade.feeMaker" : "trade.fee")}</dt>
         <dd className="mono">{formatUsd(fee)}</dd>
       </dl>
 

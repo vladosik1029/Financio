@@ -2,6 +2,7 @@ import { getCoin, unrealizedPnl } from "@financio/shared";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../components/Icon";
+import { Logo } from "../components/Logo";
 import { LoanBanner } from "../components/LoanBanner";
 import { accountSummary, dailyQuests, rankKey, tradeStats } from "../lib/game";
 import { formatSigned, formatUsd } from "../lib/format";
@@ -32,6 +33,10 @@ export function HomeScreen() {
 
   return (
     <div className="screen home">
+      <div className="brand-head">
+        <Logo size={26} />
+        iZZi <span>Financio</span>
+      </div>
       <section className="card trader">
         <div className="avatar">{name.slice(0, 1).toUpperCase()}</div>
         <div className="trader-main">

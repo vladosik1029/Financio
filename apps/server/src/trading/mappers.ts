@@ -1,5 +1,5 @@
-import type { Position } from "@financio/shared";
-import type { PositionRow } from "../db/schema.js";
+import type { Order, Position } from "@financio/shared";
+import type { OrderRow, PositionRow } from "../db/schema.js";
 
 export function toPosition(row: PositionRow): Position {
   return {
@@ -23,5 +23,25 @@ export function toPosition(row: PositionRow): Position {
     closeReason: row.closeReason,
     openedAt: row.openedAt.getTime(),
     closedAt: row.closedAt?.getTime() ?? null,
+  };
+}
+
+export function toOrder(row: OrderRow): Order {
+  return {
+    id: row.id,
+    symbol: row.symbol,
+    side: row.side,
+    type: row.type,
+    status: row.status,
+    price: row.price,
+    margin: row.margin,
+    leverage: row.leverage,
+    takeProfit: row.takeProfit,
+    stopLoss: row.stopLoss,
+    reserved: row.reserved,
+    positionId: row.positionId,
+    rejectReason: row.rejectReason,
+    createdAt: row.createdAt.getTime(),
+    updatedAt: row.updatedAt.getTime(),
   };
 }

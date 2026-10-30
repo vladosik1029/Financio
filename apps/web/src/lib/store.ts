@@ -1,4 +1,4 @@
-import type { Position, Profile, TimeframeId } from "@financio/shared";
+import type { Order, OrderEvent, Position, Profile, TimeframeId } from "@financio/shared";
 import { create } from "zustand";
 import { api } from "./api";
 
@@ -20,15 +20,28 @@ interface AppState {
   profile: Profile;
   open: Position[];
   history: Position[];
+  /** Отложенные ордера (лимит и стоп), ждущие исполнения */
+  orders: Order[];
   alert: Alert | null;
+  /** Короткое уведомление внизу экрана: исполнение или отклонение ордера */
+  toast: Toast | null;
   setTab(tab: Tab): void;
   setSymbol(symbol: string): void;
   setTf(tf: TimeframeId): void;
   refresh(): Promise<void>;
   refreshHistory(): Promise<void>;
   applyPosition(event: "opened" | "updated" | "closed", position: Position): void;
+  applyOrder(event: OrderEvent, order: Order): void;
+  showToast(toast: Toast): void;
   setBalance(balance: number): void;
   dismissAlert(): void;
+}
+
+export interface Toast {
+  /** Ключ перевода и параметры */
+  key: string;
+  params?: Record<string, string | number>;
+  error?: boolean;
 }
 
 /** Стартовый профиль, пока сервер не ответил */
@@ -55,19 +68,22 @@ export const useApp = create<AppState>((set, get) => ({
   profile: DEFAULT_PROFILE,
   open: [],
   history: [],
+  orders: [],
   alert: null,
+  toast: null,
   setTab: (tab) => set({ tab }),
   setSymbol: (symbol) => set({ symbol }),
   setTf: (tf) => set({ tf }),
 
   async refresh() {
     try {
-      const [me, open] = await Promise.all([api.me(), api.positions("open")]);
+      const [me, open, orders] = await Promise.all([api.me(), api.positions("open"), api.orders("pending")]);
       set({
         name: me.user.first_name,
         profile: me.profile,
         isAdmin: me.isAdmin ?? false,
         open: open.positions,
+        orders: orders.orders,
         online: true,
       });
     } catch {
@@ -94,6 +110,18 @@ export const useApp = create<AppState>((set, get) => ({
     } else {
       set({ open: [position, ...open].sort((a, b) => b.openedAt - a.openedAt) });
     }
+  },
+
+  applyOrder(event, order) {
+    const rest = get().orders.filter((o) => o.id !== order.id);
+    set({ orders: event === "placed" ? [order, ...rest] : rest });
+  },
+
+  showToast(toast) {
+    set({ toast });
+    setTimeout(() => {
+      if (get().toast === toast) set({ toast: null });
+    }, 3500);
   },
 
   setBalance: (balance) => set({ profile: { ...get().profile, balance } }),

@@ -3,6 +3,7 @@ import type {
   Coin,
   GameSettings,
   OpenPositionRequest,
+  Order,
   Position,
   Profile,
   Ticker,
@@ -97,6 +98,9 @@ export const api = {
   addMargin: (id: number, amount: number) =>
     request<{ position: Position }>("POST", `/positions/${id}/margin`, { amount }),
   loan: () => request<{ balance: number }>("POST", "/loan"),
+  orders: (scope: "pending" | "history") => get<{ orders: Order[] }>(`/orders?scope=${scope}&limit=100`),
+  placeOrder: (req: OpenPositionRequest) => request<{ order: Order }>("POST", "/orders", req),
+  cancelOrder: (id: number) => request<{ order: Order }>("POST", `/orders/${id}/cancel`),
 };
 
 /** Админка из MiniApp: сервер пускает по Telegram ID из ADMIN_TELEGRAM_IDS */

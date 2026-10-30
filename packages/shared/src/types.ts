@@ -39,9 +39,41 @@ export type ServerMessage =
   | { type: "pong" }
   /** Личные события игрока: приходят только при подключении с initData */
   | { type: "position"; event: "opened" | "updated" | "closed"; position: Position }
+  | { type: "order"; event: OrderEvent; order: Order }
   | { type: "balance"; balance: number };
 
 export type PositionStatus = "open" | "closed" | "liquidated";
+
+/**
+ * Типы ордеров. market — сразу по рынку; limit — по указанной цене или лучше
+ * (лонг ниже рынка, шорт выше), комиссия maker; stop — рыночный вход, когда цена
+ * дойдёт до триггера (лонг на пробой вверх, шорт на пробой вниз), комиссия taker.
+ */
+export type OrderType = "market" | "limit" | "stop";
+export type OrderStatus = "pending" | "filled" | "cancelled" | "rejected";
+export type OrderEvent = "placed" | "filled" | "cancelled" | "rejected";
+
+/** Отложенный ордер: маржа и комиссия зарезервированы с баланса до исполнения или отмены */
+export interface Order {
+  id: number;
+  symbol: string;
+  side: Side;
+  type: Exclude<OrderType, "market">;
+  status: OrderStatus;
+  /** Лимитная цена или цена триггера */
+  price: number;
+  margin: number;
+  leverage: number;
+  takeProfit: number | null;
+  stopLoss: number | null;
+  /** Сколько списано с баланса: маржа плюс максимальная комиссия */
+  reserved: number;
+  positionId: number | null;
+  /** Код причины отклонения при исполнении (TradeErrorCode) */
+  rejectReason: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
 export type CloseReason = "manual" | "take_profit" | "stop_loss" | "liquidation" | "admin";
 
 export interface Position {
@@ -122,11 +154,17 @@ export type TradeErrorCode =
   | "not_found"
   | "rate_limited"
   | "banned"
-  | "loan_unavailable";
+  | "loan_unavailable"
+  | "bad_order_price"
+  | "too_many_orders";
 
 export interface OpenPositionRequest {
   symbol: string;
   side: Side;
+  /** По умолчанию market */
+  type?: OrderType;
+  /** Для limit и stop */
+  price?: number | null;
   margin: number;
   leverage: number;
   takeProfit?: number | null;

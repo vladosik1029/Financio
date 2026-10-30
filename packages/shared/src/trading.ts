@@ -129,6 +129,20 @@ export function fillPrice(side: Side, action: "open" | "close", price: number, n
   return buying ? price * (1 + rate) : price * (1 - rate);
 }
 
+/** Достигла ли цена уровня отложенного ордера */
+export function orderTriggered(type: "limit" | "stop", side: Side, price: number, orderPrice: number): boolean {
+  const buying = side === "long";
+  // Лимит покупает дешевле или продаёт дороже, стоп входит на пробое уровня
+  if (type === "limit") return buying ? price <= orderPrice : price >= orderPrice;
+  return buying ? price >= orderPrice : price <= orderPrice;
+}
+
+/** Верно ли выставлена цена ордера относительно рынка: иначе он исполнился бы сразу */
+export function orderPriceValid(type: "limit" | "stop", side: Side, market: number, orderPrice: number): boolean {
+  if (!Number.isFinite(orderPrice) || orderPrice <= 0) return false;
+  return !orderTriggered(type, side, market, orderPrice);
+}
+
 /** Сработал ли Take Profit при текущей цене */
 export function takeProfitHit(side: Side, price: number, takeProfit: number | null): boolean {
   if (takeProfit == null) return false;

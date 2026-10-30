@@ -1,15 +1,15 @@
 /**
  * Цвета для мест, куда CSS-переменные не доходят: график и шапка Telegram.
  * Держать в синхроне с :root в styles/global.css.
- * brand — временный акцент, пока не подставлены фирменные цвета iZZi.
  */
 export const theme = {
-  bg: "#0b0c0f",
-  surface: "#16181d",
-  grid: "#1b1e24",
-  border: "#262a32",
-  muted: "#81858c",
+  bg: "#140d09",
+  surface: "#1f140e",
+  grid: "#24180f",
+  border: "#35261d",
+  muted: "#9a8a80",
   up: "#20b26c",
-  down: "#ef454a",
-  brand: "#f7a600",
+  down: "#f0444f",
+  brand: "#ff5a5c",
+  gold: "#ffc23d",
 } as const;
