@@ -11,6 +11,9 @@ import { useMarket } from "../lib/market";
 import { useApp } from "../lib/store";
 import { haptic } from "../lib/telegram";
 
+/** 12 500 → 12.5k: суммы квестов не влезают в строку целиком */
+const compact = (v: number) => (v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : String(v));
+
 /** Кабинет трейдера: первый экран с балансом, уровнем и квестами дня */
 export function HomeScreen() {
   const { t } = useTranslation();
@@ -100,7 +103,9 @@ export function HomeScreen() {
               <span className="quest-reward">
                 <span className="mono small">+{q.xp} XP</span>
                 <span className="mono small muted">
-                  {q.progress}/{q.goal}
+                  {q.kind === "volume" || q.kind === "pnl"
+                    ? `$${compact(q.progress)}/$${compact(q.goal)}`
+                    : `${q.progress}/${q.goal}`}
                 </span>
               </span>
             </div>

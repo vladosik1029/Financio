@@ -39,20 +39,77 @@ export function addXp(level: number, xp: number, gained: number): { level: numbe
   return { level, xp, levelsGained };
 }
 
-export type QuestId = "trades" | "profit" | "stopLoss";
+/** Что считает квест. Каждый тип сервер считает своим запросом по сделкам за сутки */
+export type QuestKind =
+  | "trades"
+  | "profit"
+  | "stopLoss"
+  | "takeProfit"
+  | "takeProfitHit"
+  | "limitFill"
+  | "coins"
+  | "longShort"
+  | "hold"
+  | "volume"
+  | "pnl";
+
+/** Id квеста: ключ перевода quests.<id> и запись в quest_claims */
+export type QuestId = string;
 
 export interface QuestDef {
   id: QuestId;
+  kind: QuestKind;
   goal: number;
   xp: number;
 }
 
-/** Квесты дня: обновляются в полночь UTC, опыт начисляется сразу при выполнении */
-export const DAILY_QUESTS: readonly QuestDef[] = [
-  { id: "trades", goal: 3, xp: 30 },
-  { id: "profit", goal: 1, xp: 40 },
-  { id: "stopLoss", goal: 1, xp: 30 },
+/**
+ * Пул квестов дня тремя группами: сколько торговать, как торговать и какой результат.
+ * Каждые сутки UTC из каждой группы выпадает по одному квесту.
+ * Новый квест — строка в пуле, перевод quests.<id> и, если тип новый, подсчёт на сервере.
+ */
+export const QUEST_POOL: readonly (readonly QuestDef[])[] = [
+  [
+    { id: "trades", kind: "trades", goal: 3, xp: 30 },
+    { id: "trades5", kind: "trades", goal: 5, xp: 50 },
+    { id: "volume", kind: "volume", goal: 10_000, xp: 40 },
+  ],
+  [
+    { id: "stopLoss", kind: "stopLoss", goal: 1, xp: 30 },
+    { id: "takeProfit", kind: "takeProfit", goal: 1, xp: 30 },
+    { id: "limitFill", kind: "limitFill", goal: 1, xp: 40 },
+    { id: "coins", kind: "coins", goal: 2, xp: 35 },
+    { id: "longShort", kind: "longShort", goal: 2, xp: 35 },
+  ],
+  [
+    { id: "profit", kind: "profit", goal: 1, xp: 40 },
+    { id: "profit3", kind: "profit", goal: 3, xp: 80 },
+    { id: "takeProfitHit", kind: "takeProfitHit", goal: 1, xp: 50 },
+    { id: "hold", kind: "hold", goal: 1, xp: 40 },
+    { id: "pnl", kind: "pnl", goal: 25, xp: 60 },
+  ],
 ];
+
+/** Сколько держать сделку для квеста «hold» */
+export const QUEST_HOLD_MS = 5 * 60_000;
+
+/** Детерминированный генератор: у всех игроков в один день одни и те же квесты */
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Квесты суток UTC, в которые попадает момент now */
+export function dailyQuests(now: number): QuestDef[] {
+  const rand = seeded(Math.floor(now / 86_400_000) * 2654435761);
+  return QUEST_POOL.map((group) => group[Math.floor(rand() * group.length)]!);
+}
 
 export interface QuestState extends QuestDef {
   progress: number;

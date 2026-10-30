@@ -1,18 +1,20 @@
 import {
   addXp,
-  DAILY_QUESTS,
+  dailyQuests,
   levelUpBonus,
   MIN_HOLD_FOR_XP_MS,
+  QUEST_HOLD_MS,
   questDayStart,
   tradeXp,
   xpToNextLevel,
   type Position,
   type QuestId,
+  type QuestKind,
   type QuestState,
 } from "@financio/shared";
-import { and, count, eq, gt, gte, isNotNull, sql } from "drizzle-orm";
+import { and, count, countDistinct, eq, gt, gte, isNotNull, ne, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db/index.js";
-import { ledger, positions, questClaims, users } from "../db/schema.js";
+import { ledger, orders, positions, questClaims, users } from "../db/schema.js";
 import type { Notify } from "./engine.js";
 import type { RpgService } from "./rpg.js";
 
@@ -30,33 +32,75 @@ export class ProgressService {
 
   /** Квесты текущих суток UTC с прогрессом по сделкам игрока */
   async quests(userId: number): Promise<QuestState[]> {
-    const dayStart = new Date(questDayStart(this.now()));
-    const openedToday = and(eq(positions.userId, userId), gte(positions.openedAt, dayStart));
-    const [[trades], [profit], [stopLoss]] = await Promise.all([
-      this.db.select({ n: count() }).from(positions).where(openedToday),
-      this.db
-        .select({ n: count() })
-        .from(positions)
-        .where(
-          and(
-            eq(positions.userId, userId),
-            gte(positions.closedAt, dayStart),
-            gt(positions.realizedPnl, 0),
-            // Как и опыт за сделку, квест не засчитывает мгновенные закрытия
-            sql`${positions.closedAt} - ${positions.openedAt} >= ${`${MIN_HOLD_FOR_XP_MS / 1000} seconds`}::interval`,
-          ),
-        ),
-      this.db.select({ n: count() }).from(positions).where(and(openedToday, isNotNull(positions.stopLoss))),
-    ]);
-    const progress: Record<QuestId, number> = {
-      trades: trades?.n ?? 0,
-      profit: profit?.n ?? 0,
-      stopLoss: stopLoss?.n ?? 0,
-    };
-    return DAILY_QUESTS.map((q) => {
-      const value = Math.min(progress[q.id], q.goal);
+    const now = this.now();
+    const dayStart = new Date(questDayStart(now));
+    const defs = dailyQuests(now);
+    const values = await Promise.all(defs.map((q) => this.measure(userId, q.kind, dayStart)));
+    return defs.map((q, i) => {
+      const value = Math.min(values[i] ?? 0, q.goal);
       return { ...q, progress: value, done: value >= q.goal };
     });
+  }
+
+  /** Прогресс по одному типу квеста за сутки */
+  private async measure(userId: number, kind: QuestKind, dayStart: Date): Promise<number> {
+    const mine = eq(positions.userId, userId);
+    const openedToday = and(mine, gte(positions.openedAt, dayStart));
+    const closedToday = and(mine, gte(positions.closedAt, dayStart));
+    // Как и опыт за сделку, квесты не засчитывают мгновенные закрытия
+    const heldAtLeast = (ms: number) =>
+      sql`${positions.closedAt} - ${positions.openedAt} >= ${`${ms / 1000} seconds`}::interval`;
+    const n = async (where: SQL | undefined) => (await this.db.select({ n: count() }).from(positions).where(where))[0]?.n ?? 0;
+    switch (kind) {
+      case "trades":
+        return n(openedToday);
+      case "stopLoss":
+        return n(and(openedToday, isNotNull(positions.stopLoss)));
+      case "takeProfit":
+        return n(and(openedToday, isNotNull(positions.takeProfit)));
+      case "profit":
+        return n(and(closedToday, gt(positions.realizedPnl, 0), heldAtLeast(MIN_HOLD_FOR_XP_MS)));
+      case "takeProfitHit":
+        return n(and(closedToday, eq(positions.closeReason, "take_profit")));
+      case "hold":
+        return n(and(closedToday, ne(positions.status, "liquidated"), heldAtLeast(QUEST_HOLD_MS)));
+      case "coins": {
+        const [row] = await this.db.select({ n: countDistinct(positions.symbol) }).from(positions).where(openedToday);
+        return row?.n ?? 0;
+      }
+      case "longShort": {
+        const [row] = await this.db.select({ n: countDistinct(positions.side) }).from(positions).where(openedToday);
+        return row?.n ?? 0;
+      }
+      case "volume": {
+        const [row] = await this.db
+          .select({ v: sql<number>`coalesce(sum(${positions.margin} * ${positions.leverage}), 0)` })
+          .from(positions)
+          .where(openedToday);
+        return Math.floor(Number(row?.v ?? 0));
+      }
+      case "pnl": {
+        const [row] = await this.db
+          .select({ v: sql<number>`coalesce(sum(${positions.realizedPnl}), 0)` })
+          .from(positions)
+          .where(closedToday);
+        return Math.max(0, Math.floor(Number(row?.v ?? 0)));
+      }
+      case "limitFill": {
+        const [row] = await this.db
+          .select({ n: count() })
+          .from(orders)
+          .where(
+            and(
+              eq(orders.userId, userId),
+              eq(orders.type, "limit"),
+              eq(orders.status, "filled"),
+              gte(orders.updatedAt, dayStart),
+            ),
+          );
+        return row?.n ?? 0;
+      }
+    }
   }
 
   async onPositionOpened(userId: number): Promise<void> {
