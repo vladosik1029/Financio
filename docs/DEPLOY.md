@@ -77,6 +77,40 @@ docker compose logs -f server                  # строка «Binance: под�
 - `/newapp` — создать прямую ссылку вида `t.me/<бот>/<app>` с адресом `https://fin.izzinet.xyz`;
 - `/setdescription` и `/setuserpic` — описание и аватар бота.
 
+## Если на сервере уже есть Caddy для других сайтов
+
+Тогда порты 80 и 443 заняты, и наш `web` встаёт за существующий Caddy: он не публикует порты, а подключается к Docker-сети вашего Caddy под именем `financio-web`.
+
+1. Узнайте сеть контейнера Caddy и где лежит его Caddyfile:
+
+   ```bash
+   docker inspect caddy -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+   docker inspect caddy -f '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}'
+   ```
+
+2. Добавьте в `.env` (вместо `<сеть>` — имя из первой команды):
+
+   ```
+   COMPOSE_FILE=docker-compose.yml:docker-compose.proxy.yml
+   PROXY_NETWORK=<сеть>
+   ```
+
+3. Запустите игру: `docker compose --profile bot up -d --build`.
+
+4. Допишите в Caddyfile вашего Caddy блок и перечитайте конфиг:
+
+   ```
+   fin.izzinet.xyz {
+   	reverse_proxy financio-web:80
+   }
+   ```
+
+   ```bash
+   docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+   ```
+
+Сертификат для домена выпустит ваш Caddy, как и для остальных сайтов.
+
 ## Обновление
 
 ```bash

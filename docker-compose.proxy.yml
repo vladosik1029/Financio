@@ -1,0 +1,23 @@
+# Запуск за уже работающим на сервере Caddy (или другим обратным прокси).
+# Наш web-контейнер не занимает порты 80/443, а подключается к Docker-сети прокси
+# под именем financio-web и отдаёт там MiniApp и API по обычному HTTP.
+#
+# Включение: в .env добавить
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.proxy.yml
+#   PROXY_NETWORK=<сеть контейнера вашего Caddy>
+services:
+  web:
+    ports: !reset []
+    environment:
+      # HTTPS делает внешний прокси, здесь только HTTP
+      DOMAIN: ":80"
+    networks:
+      default: {}
+      proxy:
+        aliases:
+          - financio-web
+
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:?укажите PROXY_NETWORK в .env}
