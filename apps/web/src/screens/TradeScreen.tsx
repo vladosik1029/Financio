@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { CoinSheet } from "../components/CoinSheet";
 import { Icon } from "../components/Icon";
 import { LoanBanner } from "../components/LoanBanner";
+import { OrderCard } from "../components/OrderCard";
 import { OpenPositionCard } from "../components/PositionCard";
 import { PriceChart } from "../components/PriceChart";
 import { TimeframeTabs } from "../components/TimeframeTabs";
@@ -43,14 +44,14 @@ function useTickDirection(price: number | undefined): "up" | "down" | "" {
 
 export function TradeScreen() {
   const { t } = useTranslation();
-  const { symbol, tf, open } = useApp();
+  const { symbol, tf, open, orders } = useApp();
   const { tickers, stale, connected } = useMarket();
   const ticker = tickers[symbol];
   const coin = getCoin(symbol)!;
   const now = useNow(1000);
   const dir = useTickDirection(ticker?.last);
   const [pairsOpen, setPairsOpen] = useState(false);
-  const [view, setView] = useState<"order" | "positions">("order");
+  const [view, setView] = useState<"order" | "positions" | "orders">("order");
 
   return (
     <div className="screen trade">
@@ -92,11 +93,20 @@ export function TradeScreen() {
           {t("trade.order")}
         </button>
         <button className={view === "positions" ? "seg active" : "seg"} onClick={() => setView("positions")}>
-          {t("positions.open")} ({open.length})
+          {t("positions.short")} ({open.length})
+        </button>
+        <button className={view === "orders" ? "seg active" : "seg"} onClick={() => setView("orders")}>
+          {t("orders.title")} ({orders.length})
         </button>
       </div>
       {view === "order" ? (
         <TradePanel />
+      ) : view === "orders" ? (
+        orders.length === 0 ? (
+          <p className="muted">{t("orders.none")}</p>
+        ) : (
+          orders.map((o) => <OrderCard key={o.id} order={o} />)
+        )
       ) : open.length === 0 ? (
         <p className="muted">{t("positions.none")}</p>
       ) : (

@@ -32,7 +32,7 @@ describe("TradingEngine", () => {
   });
 
   beforeEach(async () => {
-    await database.db.execute(sql`TRUNCATE ledger, positions, users, settings RESTART IDENTITY CASCADE`);
+    await database.db.execute(sql`TRUNCATE ledger, orders, positions, users, settings RESTART IDENTITY CASCADE`);
     market = new FakeMarket();
     market.set("BTCUSDT", 50_000);
     market.set("SOLUSDT", 150);
@@ -162,5 +162,77 @@ describe("TradingEngine", () => {
     expect(restarted.openCount).toBe(1);
     restarted.onMark("BTCUSDT", p.liquidationPrice - 1);
     await vi.waitFor(async () => expect(await restarted.listPositions(USER.id, "open")).toHaveLength(0));
+  });
+
+  describe("отложенные ордера", () => {
+    const place = (over: Partial<Parameters<TradingEngine["placeOrder"]>[1]> = {}) =>
+      engine.placeOrder(USER.id, {
+        symbol: "BTCUSDT",
+        side: "long",
+        type: "limit",
+        price: 49_000,
+        margin: 100,
+        leverage: 10,
+        ...over,
+      });
+
+    it("лимит резервирует деньги и исполняется ровно по своей цене с комиссией maker", async () => {
+      const order = await place({ takeProfit: 52_000 });
+      expect(order.reserved).toBeCloseTo(100.5);
+      expect(await balance()).toBeCloseTo(1000 - 100.5);
+
+      engine.onMark("BTCUSDT", 49_500);
+      expect(await engine.listOrders(USER.id, "pending")).toHaveLength(1);
+
+      engine.onMark("BTCUSDT", 48_990);
+      await vi.waitFor(async () => expect(await engine.listPositions(USER.id, "open")).toHaveLength(1));
+      const [pos] = await engine.listPositions(USER.id, "open");
+      expect(pos!.entryPrice).toBe(49_000);
+      expect(pos!.openFee).toBeCloseTo(1000 * 0.0002);
+      expect(pos!.takeProfit).toBe(52_000);
+      // Вернулась разница между зарезервированной taker-комиссией и фактической maker
+      expect(await balance()).toBeCloseTo(1000 - 100 - 0.2);
+      const [filled] = await engine.listOrders(USER.id, "history");
+      expect(filled).toMatchObject({ status: "filled", positionId: pos!.id });
+      expect(events.some((e) => e.msg.type === "order" && e.msg.event === "filled")).toBe(true);
+    });
+
+    it("стоп входит по рынку на пробое уровня", async () => {
+      await place({ type: "stop", side: "short", price: 48_000 });
+      engine.onMark("BTCUSDT", 48_500);
+      expect(await engine.listPositions(USER.id, "open")).toHaveLength(0);
+      engine.onMark("BTCUSDT", 47_900);
+      await vi.waitFor(async () => expect(await engine.listPositions(USER.id, "open")).toHaveLength(1));
+      const [pos] = await engine.listPositions(USER.id, "open");
+      expect(pos!.side).toBe("short");
+      expect(pos!.entryPrice).toBeLessThan(47_900);
+      expect(pos!.openFee).toBeCloseTo(1000 * 0.0005);
+    });
+
+    it("не даёт выставить ордер, который исполнился бы сразу", async () => {
+      await expect(place({ price: 51_000 })).rejects.toMatchObject({ code: "bad_order_price" });
+      await expect(place({ type: "stop", price: 49_000 })).rejects.toMatchObject({ code: "bad_order_price" });
+      await expect(place({ margin: 5000 })).rejects.toMatchObject({ code: "insufficient_balance" });
+    });
+
+    it("отмена возвращает весь резерв, чужой ордер отменить нельзя", async () => {
+      const order = await place();
+      await engine.ensureUser({ id: 778, first_name: "Other" });
+      await expect(engine.cancelOrder(778, order.id)).rejects.toMatchObject({ code: "not_found" });
+      const cancelled = await engine.cancelOrder(USER.id, order.id);
+      expect(cancelled.status).toBe("cancelled");
+      expect(await balance()).toBeCloseTo(1000);
+      engine.onMark("BTCUSDT", 48_000);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(await engine.listPositions(USER.id, "open")).toHaveLength(0);
+    });
+
+    it("ордер переживает перезапуск движка", async () => {
+      await place();
+      const restarted = new TradingEngine(database.db, market, new SettingsStore(database.db), () => {}, () => now);
+      await restarted.init();
+      restarted.onMark("BTCUSDT", 48_000);
+      await vi.waitFor(async () => expect(await restarted.listPositions(USER.id, "open")).toHaveLength(1));
+    });
   });
 });

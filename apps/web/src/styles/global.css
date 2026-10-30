@@ -853,3 +853,35 @@ h3 {
   background-clip: text;
   color: transparent;
 }
+
+/* Типы ордеров */
+.order-types {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.otype {
+  padding: 7px 0;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.otype.active {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+}
+.hint {
+  margin: -4px 0 0;
+}
+.tag-order {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+.pos-head .order-cancel {
+  flex: 0 0 auto;
+  margin-left: auto;
+}

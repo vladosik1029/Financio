@@ -9,13 +9,17 @@ import {
   liquidationPrice,
   liquidationPriceForMargin,
   maintenanceMarginRate,
+  MAKER_FEE_RATE,
   maxLeverageForLevel,
   MIN_LEVERAGE,
+  orderPriceValid,
+  orderTriggered,
   stopLossHit,
   takeProfitHit,
   unrealizedPnl,
   type CloseReason,
   type OpenPositionRequest,
+  type Order,
   type Position,
   type Profile,
   type ServerMessage,
@@ -26,8 +30,8 @@ import {
 import { and, count, desc, eq, ne } from "drizzle-orm";
 import type { TelegramUser } from "../auth/telegram.js";
 import type { Db } from "../db/index.js";
-import { ledger, positions, users, type PositionRow, type UserRow } from "../db/schema.js";
-import { toPosition } from "./mappers.js";
+import { ledger, orders, positions, users, type OrderRow, type PositionRow, type UserRow } from "../db/schema.js";
+import { toOrder, toPosition } from "./mappers.js";
 import type { SettingsStore } from "./settings.js";
 
 export class TradeError extends Error {
@@ -55,6 +59,16 @@ interface WatchedPosition {
   stopLoss: number | null;
 }
 
+/** Отложенный ордер в памяти: проверяется на каждом тике mark price */
+interface WatchedOrder {
+  id: number;
+  userId: number;
+  symbol: string;
+  side: Side;
+  type: "limit" | "stop";
+  price: number;
+}
+
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 const FUNDING_SLOT_KEY = "funding_slot";
@@ -66,6 +80,8 @@ const FUNDING_SLOT_KEY = "funding_slot";
 export class TradingEngine {
   private readonly watched = new Map<number, WatchedPosition>();
   private readonly closing = new Set<number>();
+  private readonly pendingOrders = new Map<number, WatchedOrder>();
+  private readonly filling = new Set<number>();
 
   constructor(
     private readonly db: Db,
@@ -81,6 +97,8 @@ export class TradingEngine {
     await this.settings.load();
     const rows = await this.db.select().from(positions).where(eq(positions.status, "open"));
     for (const row of rows) this.watch(row);
+    const pending = await this.db.select().from(orders).where(eq(orders.status, "pending"));
+    for (const row of pending) this.watchOrder(row);
   }
 
   // ---------- Игроки ----------
@@ -153,6 +171,18 @@ export class TradingEngine {
   }
 
   // ---------- Сделки ----------
+
+  async listOrders(userId: number, scope: "pending" | "history", limit = 50): Promise<Order[]> {
+    const rows = await this.db
+      .select()
+      .from(orders)
+      .where(
+        and(eq(orders.userId, userId), scope === "pending" ? eq(orders.status, "pending") : ne(orders.status, "pending")),
+      )
+      .orderBy(desc(scope === "pending" ? orders.createdAt : orders.updatedAt))
+      .limit(limit);
+    return rows.map(toOrder);
+  }
 
   async openPosition(userId: number, req: OpenPositionRequest): Promise<Position> {
     const s = this.settings.get();
@@ -302,10 +332,94 @@ export class TradingEngine {
     return balance;
   }
 
+  // ---------- Отложенные ордера ----------
+
+  /**
+   * Лимит или стоп: маржа и максимальная комиссия (taker) сразу резервируются с баланса,
+   * чтобы к моменту исполнения деньги точно были. Неистраченный остаток вернётся при исполнении.
+   */
+  async placeOrder(userId: number, req: OpenPositionRequest): Promise<Order> {
+    const s = this.settings.get();
+    if (!s.tradingEnabled) throw new TradeError("trading_disabled");
+    const coin = getCoin(req.symbol);
+    if (!coin) throw new TradeError("unknown_symbol");
+    const type = req.type;
+    if (type !== "limit" && type !== "stop") throw new TradeError("bad_order_price");
+    if (req.side !== "long" && req.side !== "short") throw new TradeError("bad_leverage");
+    if (!Number.isFinite(req.margin) || req.margin < 1) throw new TradeError("bad_margin");
+    const ticker = this.liveTicker(req.symbol);
+    const price = Number(req.price);
+    if (!orderPriceValid(type, req.side, ticker.last, price)) throw new TradeError("bad_order_price");
+
+    const { row, balance } = await this.db.transaction(async (tx) => {
+      const user = await this.lockUser(tx, userId);
+      if (!isCoinUnlocked(coin, user.level)) throw new TradeError("coin_locked");
+      if (!checkLeverage(req.leverage, user.level).ok) throw new TradeError("bad_leverage");
+      const [pending] = await tx
+        .select({ n: count() })
+        .from(orders)
+        .where(and(eq(orders.userId, userId), eq(orders.status, "pending")));
+      if ((pending?.n ?? 0) >= s.maxOpenPositions) throw new TradeError("too_many_orders");
+
+      const tp = req.takeProfit ?? null;
+      const sl = req.stopLoss ?? null;
+      validateProtection(req.side, price, liquidationPrice(req.side, price, req.leverage), tp, sl);
+
+      const reserved = req.margin + req.margin * req.leverage * s.takerFeeRate;
+      if (reserved > user.balance + 1e-9) throw new TradeError("insufficient_balance");
+      const balance = user.balance - reserved;
+      await tx.update(users).set({ balance }).where(eq(users.id, userId));
+      const now = new Date(this.now());
+      const [row] = await tx
+        .insert(orders)
+        .values({
+          userId,
+          symbol: req.symbol,
+          side: req.side,
+          type,
+          price,
+          margin: req.margin,
+          leverage: req.leverage,
+          takeProfit: tp,
+          stopLoss: sl,
+          reserved,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
+      await tx.insert(ledger).values({
+        userId,
+        type: "order_reserve",
+        amount: -reserved,
+        balanceAfter: balance,
+        note: `order #${row!.id}`,
+      });
+      return { row: row!, balance };
+    });
+
+    this.watchOrder(row);
+    const order = toOrder(row);
+    this.notify(userId, { type: "order", event: "placed", order });
+    this.notify(userId, { type: "balance", balance });
+    return order;
+  }
+
+  async cancelOrder(userId: number, orderId: number): Promise<Order> {
+    if (this.filling.has(orderId)) throw new TradeError("not_found");
+    return this.finishOrder(orderId, "cancelled", null, userId);
+  }
+
   // ---------- Рынок ----------
 
   /** Проверка ликвидаций и TP/SL на каждом обновлении mark price */
   onMark(symbol: string, mark: number): void {
+    for (const o of this.pendingOrders.values()) {
+      if (o.symbol !== symbol || this.filling.has(o.id)) continue;
+      if (!orderTriggered(o.type, o.side, mark, o.price)) continue;
+      this.fillOrder(o.id, mark).catch((err) => {
+        if (!(err instanceof TradeError)) this.log(`Не удалось исполнить ордер ${o.id}: ${(err as Error).message}`);
+      });
+    }
     for (const p of this.watched.values()) {
       if (p.symbol !== symbol || this.closing.has(p.id)) continue;
       let reason: CloseReason | null = null;
@@ -482,6 +596,156 @@ export class TradingEngine {
     this.onMark(row.symbol, mark);
   }
 
+  /**
+   * Исполнение ордера: лимит — ровно по своей цене с комиссией maker,
+   * стоп — по рынку с проскальзыванием и комиссией taker. Если позицию открыть нельзя
+   * (лимит позиций, бан), ордер отклоняется и резерв возвращается.
+   */
+  private async fillOrder(orderId: number, mark: number): Promise<void> {
+    this.filling.add(orderId);
+    try {
+      const s = this.settings.get();
+      const result = await this.db.transaction(async (tx) => {
+        const [order] = await tx
+          .select()
+          .from(orders)
+          .where(and(eq(orders.id, orderId), eq(orders.status, "pending")))
+          .for("update");
+        if (!order) return undefined;
+        const user = await this.lockUser(tx, order.userId, true);
+        const [open] = await tx
+          .select({ n: count() })
+          .from(positions)
+          .where(and(eq(positions.userId, order.userId), eq(positions.status, "open")));
+        const reject = user.banned ? "banned" : (open?.n ?? 0) >= s.maxOpenPositions ? "too_many_positions" : null;
+        if (reject) return { kind: "rejected" as const, ...(await this.closeOrderRow(tx, order, user, "rejected", reject)) };
+
+        const notional = order.margin * order.leverage;
+        const entry = order.type === "limit" ? order.price : fillPrice(order.side, "open", mark, notional);
+        const fee = notional * (order.type === "limit" ? Math.min(MAKER_FEE_RATE, s.takerFeeRate) : s.takerFeeRate);
+        const liq = liquidationPrice(order.side, entry, order.leverage);
+        // Стоп мог исполниться с проскальзыванием: защиту, ставшую неверной, снимаем
+        const tp = protectionValid(order.side, entry, liq, order.takeProfit, null) ? order.takeProfit : null;
+        const sl = protectionValid(order.side, entry, liq, null, order.stopLoss) ? order.stopLoss : null;
+        const refund = Math.max(0, order.reserved - order.margin - fee);
+        const balance = user.balance + refund;
+        const now = new Date(this.now());
+        const [pos] = await tx
+          .insert(positions)
+          .values({
+            userId: order.userId,
+            symbol: order.symbol,
+            side: order.side,
+            leverage: order.leverage,
+            margin: order.margin,
+            invested: order.margin,
+            quantity: notional / entry,
+            entryPrice: entry,
+            liquidationPrice: liq,
+            takeProfit: tp,
+            stopLoss: sl,
+            openFee: fee,
+            openedAt: now,
+          })
+          .returning();
+        const [filled] = await tx
+          .update(orders)
+          .set({ status: "filled", positionId: pos!.id, updatedAt: now })
+          .where(eq(orders.id, orderId))
+          .returning();
+        if (refund > 0) await tx.update(users).set({ balance }).where(eq(users.id, order.userId));
+        await tx.insert(ledger).values({
+          userId: order.userId,
+          type: "order_refund",
+          amount: refund,
+          balanceAfter: balance,
+          positionId: pos!.id,
+          note: `order #${orderId} filled`,
+        });
+        return { kind: "filled" as const, filled: filled!, position: pos!, balance };
+      });
+      if (!result) return;
+      this.pendingOrders.delete(orderId);
+      if (result.kind === "rejected") {
+        this.announceOrder(result.order, "rejected", result.balance);
+        return;
+      }
+      this.watch(result.position);
+      this.notify(result.filled.userId, { type: "order", event: "filled", order: toOrder(result.filled) });
+      this.notify(result.filled.userId, { type: "position", event: "opened", position: toPosition(result.position) });
+      this.notify(result.filled.userId, { type: "balance", balance: result.balance });
+    } finally {
+      this.filling.delete(orderId);
+    }
+  }
+
+  /** Отмена игроком или отклонение: резерв целиком возвращается на баланс */
+  private async finishOrder(
+    orderId: number,
+    status: "cancelled" | "rejected",
+    reason: string | null,
+    userId?: number,
+  ): Promise<Order> {
+    const result = await this.db.transaction(async (tx) => {
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(and(eq(orders.id, orderId), eq(orders.status, "pending")))
+        .for("update");
+      if (!order || (userId !== undefined && order.userId !== userId)) throw new TradeError("not_found");
+      const user = await this.lockUser(tx, order.userId, true);
+      return this.closeOrderRow(tx, order, user, status, reason);
+    });
+    this.pendingOrders.delete(orderId);
+    return this.announceOrder(result.order, status, result.balance);
+  }
+
+  private async closeOrderRow(
+    tx: Tx,
+    order: OrderRow,
+    user: UserRow,
+    status: "cancelled" | "rejected",
+    reason: string | null,
+  ): Promise<{ order: OrderRow; balance: number }> {
+    const balance = user.balance + order.reserved;
+    await tx.update(users).set({ balance }).where(eq(users.id, order.userId));
+    const [row] = await tx
+      .update(orders)
+      .set({ status, rejectReason: reason, updatedAt: new Date(this.now()) })
+      .where(eq(orders.id, order.id))
+      .returning();
+    await tx.insert(ledger).values({
+      userId: order.userId,
+      type: "order_refund",
+      amount: order.reserved,
+      balanceAfter: balance,
+      note: `order #${order.id} ${status}${reason ? `: ${reason}` : ""}`,
+    });
+    return { order: row!, balance };
+  }
+
+  private announceOrder(row: OrderRow, event: "cancelled" | "rejected", balance: number): Order {
+    const order = toOrder(row);
+    this.notify(row.userId, { type: "order", event, order });
+    this.notify(row.userId, { type: "balance", balance });
+    return order;
+  }
+
+  private watchOrder(row: OrderRow): void {
+    if (row.status !== "pending") {
+      this.pendingOrders.delete(row.id);
+      return;
+    }
+    this.pendingOrders.set(row.id, {
+      id: row.id,
+      userId: row.userId,
+      symbol: row.symbol,
+      side: row.side,
+      type: row.type,
+      price: row.price,
+    });
+  }
+
   private watch(row: PositionRow): void {
     if (row.status !== "open") {
       this.watched.delete(row.id);
@@ -530,8 +794,18 @@ export class TradingEngine {
     const s = this.settings.get();
     if (user.balance >= s.loanThreshold) return false;
     if ([...this.watched.values()].some((p) => p.userId === user.id)) return false;
+    if ([...this.pendingOrders.values()].some((o) => o.userId === user.id)) return false;
     if (!user.lastLoanAt) return true;
     return this.now() - user.lastLoanAt.getTime() >= s.loanCooldownHours * 3600_000;
+  }
+}
+
+function protectionValid(side: Side, price: number, liq: number, tp: number | null, sl: number | null): boolean {
+  try {
+    validateProtection(side, price, liq, tp, sl);
+    return true;
+  } catch {
+    return false;
   }
 }
 

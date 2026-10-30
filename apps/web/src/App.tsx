@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AlertOverlay } from "./components/AlertOverlay";
+import { GlobalToast } from "./components/GlobalToast";
 import { TabBar } from "./components/TabBar";
 import { useApp } from "./lib/store";
 import { tg } from "./lib/telegram";
@@ -31,6 +32,7 @@ export function App() {
         {tab === "admin" && isAdmin && <AdminScreen />}
       </main>
       <TabBar />
+      <GlobalToast />
       <AlertOverlay />
     </div>
   );

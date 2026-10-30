@@ -79,6 +79,19 @@ class MarketSocket {
         if (msg.event === "closed" && msg.position.closeReason === "liquidation") haptic.error();
         else if (msg.event === "closed" && msg.position.closeReason !== "manual") haptic.warning();
         break;
+      case "order": {
+        const app = useApp.getState();
+        app.applyOrder(msg.event, msg.order);
+        const params = { type: msg.order.type, side: msg.order.side, symbol: msg.order.symbol.replace("USDT", "") };
+        if (msg.event === "filled") {
+          haptic.success();
+          app.showToast({ key: "orders.filledToast", params });
+        } else if (msg.event === "rejected") {
+          haptic.error();
+          app.showToast({ key: "orders.rejectedToast", params: { ...params, reason: msg.order.rejectReason ?? "" }, error: true });
+        }
+        break;
+      }
       case "balance":
         useApp.getState().setBalance(msg.balance);
         break;

@@ -13,6 +13,11 @@ const openBody = z.object({
   takeProfit: price,
   stopLoss: price,
 });
+const orderBody = openBody.extend({ type: z.enum(["limit", "stop"]), price: z.number().positive() });
+const orderListQuery = z.object({
+  scope: z.enum(["pending", "history"]).default("pending"),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
 const protectionBody = z.object({ takeProfit: price, stopLoss: price });
 const marginBody = z.object({ amount: z.number().positive() });
 const idParams = z.object({ id: z.coerce.number().int().positive() });
@@ -100,6 +105,21 @@ export async function tradeRoutes(
     const { id } = idParams.parse(req.params);
     const { amount } = marginBody.parse(req.body);
     return { position: await engine.addMargin(req.tgUser!.id, id, amount) };
+  });
+
+  app.get("/orders", { preHandler: player }, async (req) => {
+    const q = orderListQuery.parse(req.query);
+    return { orders: await engine.listOrders(req.tgUser!.id, q.scope, q.limit) };
+  });
+
+  app.post("/orders", { preHandler: guard }, async (req) => {
+    const body = orderBody.parse(req.body);
+    return { order: await engine.placeOrder(req.tgUser!.id, body) };
+  });
+
+  app.post("/orders/:id/cancel", { preHandler: guard }, async (req) => {
+    const { id } = idParams.parse(req.params);
+    return { order: await engine.cancelOrder(req.tgUser!.id, id) };
   });
 
   app.post("/loan", { preHandler: guard }, async (req) => {

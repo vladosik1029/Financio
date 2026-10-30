@@ -10,6 +10,8 @@ import {
   liquidationPrice,
   maintenanceMarginRate,
   maxLeverageForLevel,
+  orderPriceValid,
+  orderTriggered,
   positionQuantity,
   returnOnEquity,
   tradingFee,
@@ -105,5 +107,28 @@ describe("маржа, проскальзывание, TP/SL", () => {
     expect(stopLossHit("long", 89, 90)).toBe(true);
     expect(stopLossHit("short", 89, 90)).toBe(false);
     expect(stopLossHit("long", 89, null)).toBe(false);
+  });
+});
+
+describe("отложенные ордера", () => {
+  it("лимит покупает ниже рынка, продаёт выше", () => {
+    expect(orderTriggered("limit", "long", 99, 100)).toBe(true);
+    expect(orderTriggered("limit", "long", 101, 100)).toBe(false);
+    expect(orderTriggered("limit", "short", 101, 100)).toBe(true);
+    expect(orderTriggered("limit", "short", 99, 100)).toBe(false);
+  });
+
+  it("стоп входит на пробое уровня", () => {
+    expect(orderTriggered("stop", "long", 101, 100)).toBe(true);
+    expect(orderTriggered("stop", "long", 99, 100)).toBe(false);
+    expect(orderTriggered("stop", "short", 99, 100)).toBe(true);
+  });
+
+  it("не даёт выставить ордер, который исполнится сразу", () => {
+    expect(orderPriceValid("limit", "long", 100, 95)).toBe(true);
+    expect(orderPriceValid("limit", "long", 100, 105)).toBe(false);
+    expect(orderPriceValid("stop", "long", 100, 105)).toBe(true);
+    expect(orderPriceValid("stop", "short", 100, 105)).toBe(false);
+    expect(orderPriceValid("limit", "short", 100, -1)).toBe(false);
   });
 });

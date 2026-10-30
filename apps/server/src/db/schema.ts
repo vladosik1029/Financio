@@ -59,6 +59,32 @@ export const positions = pgTable(
   (t) => [index("positions_user_status_idx").on(t.userId, t.status), index("positions_status_idx").on(t.status)],
 );
 
+/** Отложенные ордера (лимит и стоп): деньги зарезервированы с баланса до исполнения или отмены */
+export const orders = pgTable(
+  "orders",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id),
+    symbol: text("symbol").notNull(),
+    side: text("side", { enum: ["long", "short"] }).notNull(),
+    type: text("type", { enum: ["limit", "stop"] }).notNull(),
+    status: text("status", { enum: ["pending", "filled", "cancelled", "rejected"] }).notNull().default("pending"),
+    price: doublePrecision("price").notNull(),
+    margin: doublePrecision("margin").notNull(),
+    leverage: integer("leverage").notNull(),
+    takeProfit: doublePrecision("take_profit"),
+    stopLoss: doublePrecision("stop_loss"),
+    reserved: doublePrecision("reserved").notNull(),
+    positionId: integer("position_id"),
+    rejectReason: text("reject_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("orders_user_status_idx").on(t.userId, t.status), index("orders_status_idx").on(t.status)],
+);
+
 /** Журнал всех изменений баланса и маржи: для разбора спорных случаев и откатов */
 export const ledger = pgTable(
   "ledger",
@@ -68,7 +94,17 @@ export const ledger = pgTable(
       .notNull()
       .references(() => users.id),
     type: text("type", {
-      enum: ["start", "open", "close", "add_margin", "funding", "loan", "admin_adjust"],
+      enum: [
+        "start",
+        "open",
+        "close",
+        "add_margin",
+        "funding",
+        "loan",
+        "admin_adjust",
+        "order_reserve",
+        "order_refund",
+      ],
     }).notNull(),
     amount: doublePrecision("amount").notNull(),
     balanceAfter: doublePrecision("balance_after").notNull(),
@@ -87,3 +123,4 @@ export const settings = pgTable("settings", {
 
 export type UserRow = typeof users.$inferSelect;
 export type PositionRow = typeof positions.$inferSelect;
+export type OrderRow = typeof orders.$inferSelect;
