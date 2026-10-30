@@ -1,8 +1,8 @@
-import type { Order, OrderEvent, Position, Profile, ServerMessage, TimeframeId } from "@financio/shared";
+import { NO_EFFECTS, type Order, type OrderEvent, type Position, type Profile, type RpgState, type ServerMessage, type TimeframeId } from "@financio/shared";
 import { create } from "zustand";
 import { api } from "./api";
 
-export type Tab = "home" | "trade" | "portfolio" | "rating" | "profile" | "admin";
+export type Tab = "home" | "trade" | "portfolio" | "career" | "profile" | "admin";
 
 /** Событие, которое показываем поверх экрана: ликвидация, TP или SL */
 export interface Alert {
@@ -38,6 +38,8 @@ interface AppState {
   applyProgress(msg: Extract<ServerMessage, { type: "progress" }>): void;
   dismissLevelUp(): void;
   setBalance(balance: number): void;
+  /** Экипировка и навыки сменились: бонусы меняют и лимиты профиля */
+  applyRpg(rpg: RpgState): void;
   dismissAlert(): void;
 }
 
@@ -61,6 +63,7 @@ const DEFAULT_PROFILE: Profile = {
   canTakeLoan: false,
   loanAmount: 500,
   quests: [],
+  rpg: { owned: [], equipped: {}, skills: {}, skillPoints: 0, effects: { ...NO_EFFECTS } },
 };
 
 export const useApp = create<AppState>((set, get) => ({
@@ -145,5 +148,9 @@ export const useApp = create<AppState>((set, get) => ({
   dismissLevelUp: () => set({ levelUp: null }),
 
   setBalance: (balance) => set({ profile: { ...get().profile, balance } }),
+  applyRpg(rpg) {
+    set({ profile: { ...get().profile, rpg } });
+    void api.me().then((me) => set({ profile: me.profile })).catch(() => {});
+  },
   dismissAlert: () => set({ alert: null }),
 }));

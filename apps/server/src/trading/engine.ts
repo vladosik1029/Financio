@@ -26,21 +26,18 @@ import {
   type ServerMessage,
   type Side,
   type Ticker,
-  type TradeErrorCode,
 } from "@financio/shared";
 import { and, count, desc, eq, ne } from "drizzle-orm";
 import type { TelegramUser } from "../auth/telegram.js";
 import type { Db } from "../db/index.js";
 import { ledger, orders, positions, users, type OrderRow, type PositionRow, type UserRow } from "../db/schema.js";
 import { toOrder, toPosition } from "./mappers.js";
+import { TradeError } from "./errors.js";
 import { ProgressService } from "./progress.js";
+import { RpgService } from "./rpg.js";
 import type { SettingsStore } from "./settings.js";
 
-export class TradeError extends Error {
-  constructor(readonly code: TradeErrorCode) {
-    super(code);
-  }
-}
+export { TradeError };
 
 /** Что движку нужно знать о рынке */
 export interface MarketView {
@@ -85,6 +82,7 @@ export class TradingEngine {
   private readonly pendingOrders = new Map<number, WatchedOrder>();
   private readonly filling = new Set<number>();
   readonly progress: ProgressService;
+  readonly rpg: RpgService;
 
   constructor(
     private readonly db: Db,
@@ -94,7 +92,8 @@ export class TradingEngine {
     private readonly now: () => number = Date.now,
     private readonly log: (msg: string) => void = () => {},
   ) {
-    this.progress = new ProgressService(db, notify, now);
+    this.rpg = new RpgService(db, notify);
+    this.progress = new ProgressService(db, notify, now, this.rpg);
   }
 
   /** Загружает открытые позиции в память после старта сервера */
@@ -149,6 +148,8 @@ export class TradingEngine {
   async getProfile(userId: number): Promise<Profile> {
     const user = await this.getUser(userId);
     const s = this.settings.get();
+    const rpg = await this.rpg.state(userId);
+    const e = rpg.effects;
     return {
       level: user.level,
       xp: user.xp,
@@ -156,11 +157,12 @@ export class TradingEngine {
       balance: user.balance,
       minLeverage: MIN_LEVERAGE,
       maxLeverage: maxLeverageForLevel(user.level),
-      maxOpenPositions: s.maxOpenPositions,
-      takerFeeRate: s.takerFeeRate,
+      maxOpenPositions: s.maxOpenPositions + e.extraPositions,
+      takerFeeRate: s.takerFeeRate * (1 - e.feeDiscount),
       canTakeLoan: this.loanAvailable(user),
-      loanAmount: s.loanAmount,
+      loanAmount: s.loanAmount * (1 + e.loanBonus),
       quests: await this.progress.quests(userId),
+      rpg,
     };
   }
 
@@ -198,6 +200,7 @@ export class TradingEngine {
     const ticker = this.liveTicker(req.symbol);
     if (req.side !== "long" && req.side !== "short") throw new TradeError("bad_leverage");
     if (!Number.isFinite(req.margin) || req.margin < 1) throw new TradeError("bad_margin");
+    const e = await this.rpg.effects(userId);
 
     const { row, balance } = await this.db.transaction(async (tx) => {
       const user = await this.lockUser(tx, userId);
@@ -208,12 +211,12 @@ export class TradingEngine {
         .select({ n: count() })
         .from(positions)
         .where(and(eq(positions.userId, userId), eq(positions.status, "open")));
-      if ((open?.n ?? 0) >= s.maxOpenPositions) throw new TradeError("too_many_positions");
+      if ((open?.n ?? 0) >= s.maxOpenPositions + e.extraPositions) throw new TradeError("too_many_positions");
 
       const notional = req.margin * req.leverage;
-      const entry = fillPrice(req.side, "open", ticker.last, notional);
+      const entry = fillPrice(req.side, "open", ticker.last, notional, e.slippageReduction);
       const quantity = notional / entry;
-      const fee = notional * s.takerFeeRate;
+      const fee = notional * s.takerFeeRate * (1 - e.feeDiscount);
       if (req.margin + fee > user.balance + 1e-9) throw new TradeError("insufficient_balance");
 
       const liq = liquidationPrice(req.side, entry, req.leverage);
@@ -263,7 +266,8 @@ export class TradingEngine {
   async closePosition(userId: number, positionId: number): Promise<Position> {
     const row = await this.getOwnOpen(userId, positionId);
     const ticker = this.liveTicker(row.symbol);
-    const exit = fillPrice(row.side, "close", ticker.last, row.quantity * ticker.last);
+    const e = await this.rpg.effects(userId);
+    const exit = fillPrice(row.side, "close", ticker.last, row.quantity * ticker.last, e.slippageReduction);
     return this.close(positionId, exit, "manual");
   }
 
@@ -327,12 +331,13 @@ export class TradingEngine {
   /** Кредит наставника: только банкроту без открытых позиций и не чаще кулдауна */
   async takeLoan(userId: number): Promise<number> {
     const s = this.settings.get();
+    const amount = s.loanAmount * (1 + (await this.rpg.effects(userId)).loanBonus);
     const balance = await this.db.transaction(async (tx) => {
       const user = await this.lockUser(tx, userId);
       if (!this.loanAvailable(user)) throw new TradeError("loan_unavailable");
-      const balance = user.balance + s.loanAmount;
+      const balance = user.balance + amount;
       await tx.update(users).set({ balance, lastLoanAt: new Date(this.now()) }).where(eq(users.id, userId));
-      await tx.insert(ledger).values({ userId, type: "loan", amount: s.loanAmount, balanceAfter: balance });
+      await tx.insert(ledger).values({ userId, type: "loan", amount, balanceAfter: balance });
       return balance;
     });
     this.notify(userId, { type: "balance", balance });
@@ -357,6 +362,7 @@ export class TradingEngine {
     const ticker = this.liveTicker(req.symbol);
     const price = Number(req.price);
     if (!orderPriceValid(type, req.side, ticker.last, price)) throw new TradeError("bad_order_price");
+    const e = await this.rpg.effects(userId);
 
     const { row, balance } = await this.db.transaction(async (tx) => {
       const user = await this.lockUser(tx, userId);
@@ -366,13 +372,13 @@ export class TradingEngine {
         .select({ n: count() })
         .from(orders)
         .where(and(eq(orders.userId, userId), eq(orders.status, "pending")));
-      if ((pending?.n ?? 0) >= s.maxOpenPositions) throw new TradeError("too_many_orders");
+      if ((pending?.n ?? 0) >= s.maxOpenPositions + e.extraPositions) throw new TradeError("too_many_orders");
 
       const tp = req.takeProfit ?? null;
       const sl = req.stopLoss ?? null;
       validateProtection(req.side, price, liquidationPrice(req.side, price, req.leverage), tp, sl);
 
-      const reserved = req.margin + req.margin * req.leverage * s.takerFeeRate;
+      const reserved = req.margin + req.margin * req.leverage * s.takerFeeRate * (1 - e.feeDiscount);
       if (reserved > user.balance + 1e-9) throw new TradeError("insufficient_balance");
       const balance = user.balance - reserved;
       await tx.update(users).set({ balance }).where(eq(users.id, userId));
@@ -512,6 +518,10 @@ export class TradingEngine {
     this.closing.add(positionId);
     try {
       const s = this.settings.get();
+      // Бонусы читаем до транзакции: встроенная база держит одно соединение
+      const [owner] = await this.db.select({ userId: positions.userId }).from(positions).where(eq(positions.id, positionId));
+      if (!owner) throw new TradeError("not_found");
+      const e = await this.rpg.effects(owner.userId);
       const { row, balance } = await this.db.transaction(async (tx) => {
         const [pos] = await tx
           .select()
@@ -525,7 +535,7 @@ export class TradingEngine {
         let closeFee = 0;
         if (reason !== "liquidation") {
           const pnl = unrealizedPnl(pos.side, pos.entryPrice, exitPrice, pos.quantity);
-          closeFee = pos.quantity * exitPrice * s.takerFeeRate;
+          closeFee = pos.quantity * exitPrice * s.takerFeeRate * (1 - e.feeDiscount);
           payout = Math.max(0, pos.margin + pnl - closeFee);
         }
         const balance = user.balance + payout;
@@ -613,6 +623,9 @@ export class TradingEngine {
     this.filling.add(orderId);
     try {
       const s = this.settings.get();
+      const [owner] = await this.db.select({ userId: orders.userId }).from(orders).where(eq(orders.id, orderId));
+      if (!owner) return;
+      const e = await this.rpg.effects(owner.userId);
       const result = await this.db.transaction(async (tx) => {
         const [order] = await tx
           .select()
@@ -625,12 +638,15 @@ export class TradingEngine {
           .select({ n: count() })
           .from(positions)
           .where(and(eq(positions.userId, order.userId), eq(positions.status, "open")));
-        const reject = user.banned ? "banned" : (open?.n ?? 0) >= s.maxOpenPositions ? "too_many_positions" : null;
+        const full = (open?.n ?? 0) >= s.maxOpenPositions + e.extraPositions;
+        const reject = user.banned ? "banned" : full ? "too_many_positions" : null;
         if (reject) return { kind: "rejected" as const, ...(await this.closeOrderRow(tx, order, user, "rejected", reject)) };
 
         const notional = order.margin * order.leverage;
-        const entry = order.type === "limit" ? order.price : fillPrice(order.side, "open", mark, notional);
-        const fee = notional * (order.type === "limit" ? Math.min(MAKER_FEE_RATE, s.takerFeeRate) : s.takerFeeRate);
+        const entry =
+          order.type === "limit" ? order.price : fillPrice(order.side, "open", mark, notional, e.slippageReduction);
+        const rate = order.type === "limit" ? Math.min(MAKER_FEE_RATE, s.takerFeeRate) : s.takerFeeRate;
+        const fee = notional * rate * (1 - e.feeDiscount);
         const liq = liquidationPrice(order.side, entry, order.leverage);
         // Стоп мог исполниться с проскальзыванием: защиту, ставшую неверной, снимаем
         const tp = protectionValid(order.side, entry, liq, order.takeProfit, null) ? order.takeProfit : null;

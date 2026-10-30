@@ -14,6 +14,7 @@ import { and, count, eq, gt, gte, isNotNull, sql } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import { ledger, positions, questClaims, users } from "../db/schema.js";
 import type { Notify } from "./engine.js";
+import type { RpgService } from "./rpg.js";
 
 /**
  * Прогрессия игрока: опыт за сделки, квесты дня и уровни.
@@ -24,6 +25,7 @@ export class ProgressService {
     private readonly db: Db,
     private readonly notify: Notify,
     private readonly now: () => number,
+    private readonly rpg: RpgService,
   ) {}
 
   /** Квесты текущих суток UTC с прогрессом по сделкам игрока */
@@ -81,7 +83,8 @@ export class ProgressService {
     }
   }
 
-  private async award(userId: number, gained: number, reason: "trade" | "quest", questId?: QuestId): Promise<void> {
+  private async award(userId: number, base: number, reason: "trade" | "quest", questId?: QuestId): Promise<void> {
+    const gained = Math.round(base * (1 + (await this.rpg.effects(userId)).xpBonus));
     const result = await this.db.transaction(async (tx) => {
       const [user] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
       if (!user) return undefined;

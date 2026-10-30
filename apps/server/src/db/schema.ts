@@ -102,6 +102,33 @@ export const questClaims = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.day, t.questId] })],
 );
 
+/** Купленная экипировка; equipped — надета ли (одна вещь на слот) */
+export const userItems = pgTable(
+  "user_items",
+  {
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id),
+    itemId: text("item_id").notNull(),
+    equipped: boolean("equipped").notNull().default(false),
+    purchasedAt: timestamp("purchased_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.itemId] })],
+);
+
+/** Ранги навыков игрока */
+export const userSkills = pgTable(
+  "user_skills",
+  {
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id),
+    skillId: text("skill_id").notNull(),
+    rank: integer("rank").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.skillId] })],
+);
+
 /** Журнал всех изменений баланса и маржи: для разбора спорных случаев и откатов */
 export const ledger = pgTable(
   "ledger",
@@ -122,6 +149,7 @@ export const ledger = pgTable(
         "order_reserve",
         "order_refund",
         "level_bonus",
+        "shop_purchase",
       ],
     }).notNull(),
     amount: doublePrecision("amount").notNull(),

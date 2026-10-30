@@ -944,3 +944,141 @@ h3 {
 .levelup .overlay-title {
   color: var(--text);
 }
+
+/* Карьера: экипировка и навыки */
+.effect-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.effect {
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--up-soft, rgba(32, 178, 108, 0.14));
+  color: var(--up);
+  font-size: 12px;
+  font-weight: 500;
+}
+.slots {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.slot {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--rarity, var(--border));
+}
+.slot.empty {
+  border-style: dashed;
+}
+.slot-item {
+  margin-top: 2px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.slot.empty .slot-item {
+  color: var(--muted);
+  font-weight: 400;
+}
+.rarity-common {
+  --rarity: #9a8a80;
+}
+.rarity-rare {
+  --rarity: #3d9bff;
+}
+.rarity-epic {
+  --rarity: #b46cff;
+}
+.shop-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.shop-slot {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.shop-item,
+.skill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-left: 3px solid var(--rarity, var(--border));
+}
+.skill {
+  margin-bottom: 8px;
+  border-left-color: var(--brand);
+}
+.shop-item.locked,
+.skill.locked {
+  opacity: 0.55;
+}
+.shop-main {
+  flex: 1;
+  min-width: 0;
+}
+.shop-name {
+  font-weight: 600;
+}
+.rarity {
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--rarity);
+}
+.shop-action {
+  flex: 0 0 auto;
+}
+.shop-action .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+}
+.shop-action .chip:disabled {
+  opacity: 0.5;
+}
+.skill-points {
+  margin-bottom: 10px;
+}
+.skill-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.skill-row .effect-list {
+  margin-top: 0;
+}
+.pips {
+  display: flex;
+  gap: 4px;
+}
+.pip {
+  width: 14px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+.pip.on {
+  background: var(--brand-grad);
+}
+.skill-up {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--brand-grad);
+  color: var(--brand-ink);
+}
+.skill-up:disabled {
+  background: var(--surface-2);
+  color: var(--muted);
+}

@@ -1,4 +1,5 @@
 import type { QuestId, QuestState } from "./progress.js";
+import type { RpgState } from "./rpg.js";
 import type { TimeframeId } from "./timeframes.js";
 
 export type Side = "long" | "short";
@@ -41,6 +42,8 @@ export type ServerMessage =
   /** Личные события игрока: приходят только при подключении с initData */
   | { type: "position"; event: "opened" | "updated" | "closed"; position: Position }
   | { type: "order"; event: OrderEvent; order: Order }
+  /** Изменились экипировка, навыки или бонусы */
+  | { type: "rpg"; state: RpgState }
   /** Начислен опыт: за сделку или квест; при новом уровне приходит и бонус на баланс */
   | {
       type: "progress";
@@ -129,6 +132,8 @@ export interface Profile {
   loanAmount: number;
   /** Квесты дня с прогрессом, считает сервер */
   quests: QuestState[];
+  /** Экипировка, навыки и итоговые бонусы */
+  rpg: RpgState;
 }
 
 /** Настройки игры, которые меняются из админки */
@@ -171,7 +176,15 @@ export type TradeErrorCode =
   | "banned"
   | "loan_unavailable"
   | "bad_order_price"
-  | "too_many_orders";
+  | "too_many_orders"
+  | "unknown_item"
+  | "item_locked"
+  | "item_not_owned"
+  | "already_owned"
+  | "unknown_skill"
+  | "skill_locked"
+  | "skill_maxed"
+  | "no_skill_points";
 
 export interface OpenPositionRequest {
   symbol: string;

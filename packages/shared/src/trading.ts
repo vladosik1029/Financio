@@ -123,9 +123,15 @@ export function slippageRate(notional: number): number {
  * Цена исполнения рыночного ордера с проскальзыванием.
  * Открытие лонга и закрытие шорта — покупка (дороже), остальное — продажа (дешевле).
  */
-export function fillPrice(side: Side, action: "open" | "close", price: number, notional: number): number {
+export function fillPrice(
+  side: Side,
+  action: "open" | "close",
+  price: number,
+  notional: number,
+  slippageReduction = 0,
+): number {
   const buying = (side === "long") === (action === "open");
-  const rate = slippageRate(notional);
+  const rate = slippageRate(notional) * (1 - slippageReduction);
   return buying ? price * (1 + rate) : price * (1 - rate);
 }
 

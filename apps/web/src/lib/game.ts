@@ -1,4 +1,4 @@
-import { COINS, unrealizedPnl, type Position, type Profile, type Ticker } from "@financio/shared";
+import { COINS, unrealizedPnl, type EffectKey, type Effects, type Position, type Profile, type Ticker } from "@financio/shared";
 
 /** Ранг трейдера по уровню: ключ перевода ranks.* */
 export function rankKey(level: number): string {
@@ -104,4 +104,14 @@ export function untilQuestReset(now = Date.now()): string {
   const h = Math.floor(left / 3600_000);
   const m = Math.floor((left % 3600_000) / 60_000);
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Эффекты вещи или навыка строками перевода effects.*: доли переводим в проценты */
+export function effectLines(effects: Partial<Effects>, times = 1): { key: string; v: number }[] {
+  return (Object.keys(effects) as EffectKey[])
+    .filter((k) => (effects[k] ?? 0) > 0)
+    .map((k) => {
+      const value = (effects[k] ?? 0) * times;
+      return { key: `effects.${k}`, v: k === "extraPositions" ? value : Math.round(value * 100) };
+    });
 }

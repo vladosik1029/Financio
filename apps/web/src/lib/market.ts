@@ -99,6 +99,9 @@ class MarketSocket {
       case "balance":
         useApp.getState().setBalance(msg.balance);
         break;
+      case "rpg":
+        useApp.getState().applyRpg(msg.state);
+        break;
     }
   }
 }

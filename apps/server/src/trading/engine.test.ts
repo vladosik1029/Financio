@@ -32,7 +32,7 @@ describe("TradingEngine", () => {
   });
 
   beforeEach(async () => {
-    await database.db.execute(sql`TRUNCATE ledger, quest_claims, orders, positions, users, settings RESTART IDENTITY CASCADE`);
+    await database.db.execute(sql`TRUNCATE ledger, user_items, user_skills, quest_claims, orders, positions, users, settings RESTART IDENTITY CASCADE`);
     market = new FakeMarket();
     market.set("BTCUSDT", 50_000);
     market.set("SOLUSDT", 150);
@@ -276,6 +276,42 @@ describe("TradingEngine", () => {
       await vi.waitFor(async () => expect((await profile()).level).toBe(2));
       expect((await profile()).xp).toBe(20);
       expect((await profile()).balance).toBeCloseTo(before - 3 * 100.5 + 100);
+    });
+  });
+
+  describe("экипировка и навыки", () => {
+    it("покупка списывает деньги, надевает вещь и даёт скидку на комиссию", async () => {
+      const state = await engine.rpg.buy(USER.id, "second_monitor");
+      expect(state.equipped.monitor).toBe("second_monitor");
+      expect(await balance()).toBe(700);
+      const p = await open();
+      expect(p.openFee).toBeCloseTo(1000 * 0.0005 * 0.95);
+      await expect(engine.rpg.buy(USER.id, "second_monitor")).rejects.toMatchObject({ code: "already_owned" });
+      await expect(engine.rpg.buy(USER.id, "ultrawide")).rejects.toMatchObject({ code: "item_locked" });
+    });
+
+    it("в слоте одна вещь: надевание другой снимает прежнюю", async () => {
+      await database.db.execute(sql`UPDATE users SET level = 5, balance = 10000`);
+      await engine.rpg.buy(USER.id, "second_monitor");
+      const second = await engine.rpg.buy(USER.id, "ultrawide");
+      // Слот был занят: новая вещь лежит в инвентаре
+      expect(second.equipped.monitor).toBe("second_monitor");
+      const equipped = await engine.rpg.equip(USER.id, "ultrawide");
+      expect(equipped.equipped.monitor).toBe("ultrawide");
+      expect(equipped.effects.feeDiscount).toBeCloseTo(0.1);
+      const off = await engine.rpg.unequip(USER.id, "ultrawide");
+      expect(off.effects.feeDiscount).toBe(0);
+    });
+
+    it("навыки качаются за очки уровня", async () => {
+      await expect(engine.rpg.upgradeSkill(USER.id, "analyst")).rejects.toMatchObject({ code: "no_skill_points" });
+      await database.db.execute(sql`UPDATE users SET level = 3`);
+      await engine.rpg.upgradeSkill(USER.id, "risk_manager").catch((e) => expect(e.code).toBe("skill_locked"));
+      await engine.rpg.upgradeSkill(USER.id, "discipline");
+      const state = await engine.rpg.upgradeSkill(USER.id, "discipline");
+      expect(state.skills.discipline).toBe(2);
+      expect(state.skillPoints).toBe(0);
+      expect((await engine.getProfile(USER.id)).takerFeeRate).toBeCloseTo(0.0005 * 0.94);
     });
   });
 });

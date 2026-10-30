@@ -3,7 +3,7 @@ import { haptic } from "../lib/telegram";
 import { useApp, type Tab } from "../lib/store";
 import { Icon } from "./Icon";
 
-const TABS: Tab[] = ["home", "trade", "portfolio", "rating", "profile"];
+const TABS: Tab[] = ["home", "trade", "portfolio", "career", "profile"];
 const ADMIN_TABS: Tab[] = [...TABS, "admin"];
 
 export function TabBar() {
