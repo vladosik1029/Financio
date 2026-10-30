@@ -289,7 +289,7 @@ export const ru = {
     title: "Скоро",
     rating: "Здесь будут рейтинги и турниры.",
   },
-  profile: { language: "Язык", id: "Telegram ID", disclaimer: "Все деньги в игре виртуальные. Это не финансовый совет." },
+  profile: { upgrade: "Улучшить рабочее место", language: "Язык", id: "Telegram ID", disclaimer: "Все деньги в игре виртуальные. Это не финансовый совет." },
 };
 
 export type Messages = typeof ru;

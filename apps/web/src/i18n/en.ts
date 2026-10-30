@@ -291,5 +291,5 @@ export const en: Messages = {
     title: "Coming soon",
     rating: "Leaderboards and tournaments will live here.",
   },
-  profile: { language: "Language", id: "Telegram ID", disclaimer: "All money in the game is virtual. This is not financial advice." },
+  profile: { upgrade: "Upgrade workspace", language: "Language", id: "Telegram ID", disclaimer: "All money in the game is virtual. This is not financial advice." },
 };

@@ -1082,3 +1082,93 @@ h3 {
   background: var(--surface-2);
   color: var(--muted);
 }
+
+/* Трейдер за столом: слои одного размера друг на друге */
+.trader-scene {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #170f0b;
+}
+.scene-layer,
+.scene-layer svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.trader-scene [id="head"],
+.trader-scene [id="eyes"],
+.trader-scene [id="body"],
+.trader-scene [id^="arm-"] {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+.trader-scene [id="body"] {
+  animation: scene-breathe 4s ease-in-out infinite;
+}
+.trader-scene [id="head"] {
+  animation: scene-nod 6s ease-in-out infinite;
+}
+.trader-scene [id="eyes"] {
+  transform-origin: center;
+  animation: scene-blink 5s infinite;
+}
+.trader-scene [id="arm-left"] {
+  animation: scene-type 0.5s ease-in-out infinite alternate;
+}
+.trader-scene [id="arm-right"] {
+  animation: scene-type 0.5s ease-in-out 0.25s infinite alternate;
+}
+.trader-scene [id="screen"] {
+  animation: scene-screen 3s ease-in-out infinite;
+}
+@keyframes scene-breathe {
+  50% {
+    transform: scaleY(1.02);
+  }
+}
+@keyframes scene-nod {
+  0%, 70%, 100% {
+    transform: rotate(0deg);
+  }
+  80% {
+    transform: rotate(-3deg);
+  }
+}
+@keyframes scene-blink {
+  0%, 94%, 100% {
+    transform: scaleY(1);
+  }
+  97% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes scene-type {
+  to {
+    transform: translateY(-1.5px);
+  }
+}
+@keyframes scene-screen {
+  50% {
+    opacity: 0.8;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trader-scene * {
+    animation: none !important;
+  }
+}
+.scene-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+.scene-caption .chip {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+}
