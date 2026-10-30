@@ -24,6 +24,10 @@ export const users = pgTable("users", {
   xp: integer("xp").notNull().default(0),
   banned: boolean("banned").notNull().default(false),
   lastLoanAt: timestamp("last_loan_at", { withTimezone: true }),
+  /** Перерыв после тильта: до этого момента торговать нельзя */
+  breakUntil: timestamp("break_until", { withTimezone: true }),
+  /** Награда за последний перерыв уже выдана */
+  breakClaimed: boolean("break_claimed").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -150,6 +154,7 @@ export const ledger = pgTable(
         "order_refund",
         "level_bonus",
         "shop_purchase",
+        "break_bonus",
       ],
     }).notNull(),
     amount: doublePrecision("amount").notNull(),
@@ -170,3 +175,16 @@ export const settings = pgTable("settings", {
 export type UserRow = typeof users.$inferSelect;
 export type PositionRow = typeof positions.$inferSelect;
 export type OrderRow = typeof orders.$inferSelect;
+
+/** Полученные достижения: награда выдаётся один раз */
+export const userAchievements = pgTable(
+  "user_achievements",
+  {
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id),
+    achievementId: text("achievement_id").notNull(),
+    unlockedAt: timestamp("unlocked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.achievementId] })],
+);

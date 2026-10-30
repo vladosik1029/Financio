@@ -1,4 +1,12 @@
-import { dailyQuests, type ServerMessage, type Ticker } from "@financio/shared";
+import {
+  activeEvent,
+  BREAK_MS,
+  dailyQuests,
+  eventForSlot,
+  EVENT_SLOT_MS,
+  type ServerMessage,
+  type Ticker,
+} from "@financio/shared";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { openDatabase, type Database } from "../db/index.js";
@@ -32,11 +40,13 @@ describe("TradingEngine", () => {
   });
 
   beforeEach(async () => {
-    await database.db.execute(sql`TRUNCATE ledger, user_items, user_skills, quest_claims, orders, positions, users, settings RESTART IDENTITY CASCADE`);
+    await database.db.execute(sql`TRUNCATE ledger, user_achievements, user_items, user_skills, quest_claims, orders, positions, users, settings RESTART IDENTITY CASCADE`);
     market = new FakeMarket();
     market.set("BTCUSDT", 50_000);
     market.set("SOLUSDT", 150);
+    // Рыночное событие меняет комиссии и опыт: базовые тесты идут вне его
     now = Date.UTC(2026, 9, 30, 10, 0, 0);
+    while (activeEvent(now) || activeEvent(now + 26 * HOUR)) now += HOUR;
     events = [];
     engine = new TradingEngine(
       database.db,
@@ -258,10 +268,17 @@ describe("TradingEngine", () => {
       now += 60_000;
       market.set("BTCUSDT", 51_000);
       await engine.closePosition(USER.id, p.id);
-      // ~+18% к марже: 15 + 9 XP, плюс квест «закрой сделку в плюс» +40
-      await vi.waitFor(async () => expect((await profile()).xp).toBe(64));
+      // ~+18% к марже: 15 + 9 XP, квест «закрой сделку в плюс» +40,
+      // достижения «первая сделка» +20 и «первая прибыль» +30: всего 114, это уровень 2 и 14 XP
+      await vi.waitFor(async () => expect((await profile()).achievements).toHaveLength(2));
+      expect(await profile()).toMatchObject({ level: 2, xp: 14 });
       const progress = events.filter((e) => e.msg.type === "progress");
-      expect(progress.map((e) => (e.msg as { reason: string }).reason)).toEqual(["trade", "quest"]);
+      expect(progress.map((e) => (e.msg as { reason: string }).reason)).toEqual([
+        "trade",
+        "quest",
+        "achievement",
+        "achievement",
+      ]);
     });
 
     it("квесты дня награждают один раз, новый уровень даёт бонус на баланс", async () => {
@@ -328,6 +345,78 @@ describe("TradingEngine", () => {
       expect(state.skills.discipline).toBe(2);
       expect(state.skillPoints).toBe(0);
       expect((await engine.getProfile(USER.id)).takerFeeRate).toBeCloseTo(0.0005 * 0.94);
+    });
+  });
+
+  describe("достижения, тильт, рейтинг, события", () => {
+    const profile = () => engine.getProfile(USER.id);
+    const trade = async (exit: number, side: "long" | "short" = "long") => {
+      market.set("BTCUSDT", 50_000);
+      const p = await open({ side });
+      now += 60_000;
+      market.set("BTCUSDT", exit);
+      await engine.closePosition(USER.id, p.id);
+    };
+
+    it("первая сделка и первая прибыль дают достижения один раз", async () => {
+      await trade(51_000);
+      await vi.waitFor(async () => expect((await profile()).achievements.sort()).toEqual(["first_profit", "first_trade"]));
+      await trade(51_000);
+      await new Promise((r) => setTimeout(r, 50));
+      const refs = events
+        .filter((e) => e.msg.type === "progress" && e.msg.reason === "achievement")
+        .map((e) => (e.msg as { ref?: string }).ref);
+      expect(refs.sort()).toEqual(["first_profit", "first_trade"]);
+    });
+
+    it("после трёх убытков подряд перерыв: торговать нельзя, после — награда", async () => {
+      expect((await profile()).tilt.eligible).toBe(false);
+      for (let i = 0; i < 3; i++) await trade(49_500);
+      await vi.waitFor(async () => expect((await profile()).tilt.eligible).toBe(true));
+      await expect(engine.progress.claimBreak(USER.id)).rejects.toMatchObject({ code: "break_not_over" });
+      const state = await engine.progress.startBreak(USER.id);
+      expect(state.breakUntil).toBe(now + BREAK_MS);
+      await expect(open()).rejects.toMatchObject({ code: "on_break" });
+      await expect(engine.progress.claimBreak(USER.id)).rejects.toMatchObject({ code: "break_not_over" });
+
+      now += BREAK_MS;
+      const before = await profile();
+      const after = await engine.progress.claimBreak(USER.id);
+      expect(after).toEqual({ eligible: false, breakUntil: null, claimable: false });
+      const levelBonus = (await profile()).level > before.level ? 100 : 0;
+      expect(await balance()).toBeCloseTo(before.balance + 50 + levelBonus);
+      expect((await profile()).achievements).toContain("zen");
+      await expect(engine.progress.claimBreak(USER.id)).rejects.toMatchObject({ code: "break_not_over" });
+      // Второй перерыв в те же сутки не даётся
+      await expect(engine.progress.startBreak(USER.id)).rejects.toMatchObject({ code: "break_unavailable" });
+      await open();
+    });
+
+    it("рейтинг по PnL: топ и место игрока", async () => {
+      const other = { id: 778, first_name: "Other" };
+      await engine.ensureUser(other);
+      await engine.ensureUser({ id: 779, first_name: "Idle" });
+      await trade(49_000);
+      market.set("BTCUSDT", 50_000);
+      const p = await engine.openPosition(other.id, { symbol: "BTCUSDT", side: "long", margin: 100, leverage: 10 });
+      now += 60_000;
+      market.set("BTCUSDT", 52_000);
+      await engine.closePosition(other.id, p.id);
+
+      const board = await engine.leaderboard.get("day", USER.id);
+      expect(board.rows.map((r) => r.userId)).toEqual([other.id, USER.id]);
+      expect(board.rows[0]!.pnl).toBeGreaterThan(0);
+      expect(board.me).toMatchObject({ rank: 2, userId: USER.id, trades: 1 });
+      expect((await engine.leaderboard.get("week", 779)).me).toBeNull();
+    });
+
+    it("событие «каникулы комиссий» на монете снижает комиссию вдвое", async () => {
+      let slot = Math.floor(now / EVENT_SLOT_MS);
+      while (!(eventForSlot(slot).kind === "feeHoliday" && eventForSlot(slot).symbol === "BTCUSDT")) slot++;
+      now = eventForSlot(slot).startsAt + 1000;
+      const p = await open();
+      expect(p.openFee).toBeCloseTo(1000 * 0.0005 * 0.5);
+      expect((await profile()).event).toMatchObject({ kind: "feeHoliday", symbol: "BTCUSDT" });
     });
   });
 });

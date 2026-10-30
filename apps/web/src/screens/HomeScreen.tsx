@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "../components/Icon";
 import { Logo } from "../components/Logo";
 import { LoanBanner } from "../components/LoanBanner";
+import { EventBanner } from "../components/EventBanner";
 import { MentorCard } from "../components/MentorCard";
 import { accountSummary, rankKey, tradeStats, untilQuestReset } from "../lib/game";
 import { formatSigned, formatUsd } from "../lib/format";
@@ -82,6 +83,7 @@ export function HomeScreen() {
       </section>
 
       <LoanBanner />
+      <EventBanner />
       <MentorCard />
 
       <div className="section-head">

@@ -13,6 +13,8 @@ export function GlobalToast() {
     side: p.side ? t(`trade.${p.side}`) : "",
     reason: p.reason ? t(`errors.${p.reason}`) : "",
     quest: p.quest ? t(`quests.${p.quest}`) : "",
+    achievement: p.achievement ? t(`achievements.${p.achievement}.name`) : "",
+    event: p.event ? t(`events.${p.event}.title`) : "",
   });
   return <div className={toast.error ? "toast error floating" : "toast floating"}>{text}</div>;
 }

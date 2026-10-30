@@ -2,6 +2,7 @@ import { getItem, ITEM_SLOTS, ITEMS, SKILLS, type ItemDef, type SkillDef } from 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../components/Icon";
+import { LeaderboardView } from "../components/LeaderboardView";
 import { ApiError, api } from "../lib/api";
 import { formatUsd } from "../lib/format";
 import { effectLines } from "../lib/game";
@@ -81,7 +82,7 @@ export function CareerScreen() {
 
       {view === "gear" && <Gear />}
       {view === "skills" && <Skills />}
-      {view === "rating" && <p className="muted">{t("placeholder.rating")}</p>}
+      {view === "rating" && <LeaderboardView />}
     </div>
   );
 }

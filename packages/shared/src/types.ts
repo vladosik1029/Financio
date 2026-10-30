@@ -1,4 +1,6 @@
-import type { QuestId, QuestState } from "./progress.js";
+import type { TiltState } from "./achievements.js";
+import type { MarketEvent } from "./events.js";
+import type { QuestState } from "./progress.js";
 import type { RpgState } from "./rpg.js";
 import type { TimeframeId } from "./timeframes.js";
 
@@ -47,8 +49,9 @@ export type ServerMessage =
   /** Начислен опыт: за сделку или квест; при новом уровне приходит и бонус на баланс */
   | {
       type: "progress";
-      reason: "trade" | "quest";
-      questId?: QuestId;
+      reason: "trade" | "quest" | "achievement" | "break" | "event";
+      /** Id квеста или достижения */
+      ref?: string;
       gained: number;
       level: number;
       xp: number;
@@ -134,6 +137,30 @@ export interface Profile {
   quests: QuestState[];
   /** Экипировка, навыки и итоговые бонусы */
   rpg: RpgState;
+  /** Полученные достижения */
+  achievements: string[];
+  /** Тильт и перерыв */
+  tilt: TiltState;
+  /** Идущее или ближайшее рыночное событие */
+  event: MarketEvent;
+}
+
+export type LeaderboardPeriod = "day" | "week" | "all";
+
+export interface LeaderboardRow {
+  rank: number;
+  userId: number;
+  name: string;
+  level: number;
+  pnl: number;
+  trades: number;
+}
+
+export interface Leaderboard {
+  period: LeaderboardPeriod;
+  rows: LeaderboardRow[];
+  /** Строка игрока, даже если он не в топе; null — сделок за период нет */
+  me: LeaderboardRow | null;
 }
 
 /** Настройки игры, которые меняются из админки */
@@ -184,7 +211,10 @@ export type TradeErrorCode =
   | "unknown_skill"
   | "skill_locked"
   | "skill_maxed"
-  | "no_skill_points";
+  | "no_skill_points"
+  | "on_break"
+  | "break_unavailable"
+  | "break_not_over";
 
 export interface OpenPositionRequest {
   symbol: string;
