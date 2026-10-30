@@ -26,6 +26,9 @@ import {
   type ServerMessage,
   type Side,
   type Ticker,
+  currentOrNextEvent,
+  eventFeeMultiplier,
+  type Effects,
 } from "@financio/shared";
 import { and, count, desc, eq, ne } from "drizzle-orm";
 import type { TelegramUser } from "../auth/telegram.js";
@@ -33,6 +36,7 @@ import type { Db } from "../db/index.js";
 import { ledger, orders, positions, users, type OrderRow, type PositionRow, type UserRow } from "../db/schema.js";
 import { toOrder, toPosition } from "./mappers.js";
 import { TradeError } from "./errors.js";
+import { LeaderboardService } from "./leaderboard.js";
 import { ProgressService } from "./progress.js";
 import { RpgService } from "./rpg.js";
 import type { SettingsStore } from "./settings.js";
@@ -83,6 +87,7 @@ export class TradingEngine {
   private readonly filling = new Set<number>();
   readonly progress: ProgressService;
   readonly rpg: RpgService;
+  readonly leaderboard: LeaderboardService;
 
   constructor(
     private readonly db: Db,
@@ -92,7 +97,8 @@ export class TradingEngine {
     private readonly now: () => number = Date.now,
     private readonly log: (msg: string) => void = () => {},
   ) {
-    this.rpg = new RpgService(db, notify);
+    this.leaderboard = new LeaderboardService(db, now);
+    this.rpg = new RpgService(db, notify, (userId, state) => this.track(this.progress.onRpgChanged(userId, state)));
     this.progress = new ProgressService(db, notify, now, this.rpg);
   }
 
@@ -163,7 +169,19 @@ export class TradingEngine {
       loanAmount: s.loanAmount * (1 + e.loanBonus),
       quests: await this.progress.quests(userId),
       rpg,
+      achievements: await this.progress.achievements(userId),
+      tilt: await this.progress.tilt(userId),
+      event: currentOrNextEvent(this.now()),
     };
+  }
+
+  /** Множитель комиссии: скидка экипировки и навыков и рыночное событие на монете */
+  private feeMul(e: Effects, symbol: string): number {
+    return (1 - e.feeDiscount) * eventFeeMultiplier(symbol, this.now());
+  }
+
+  private checkBreak(user: UserRow): void {
+    if (user.breakUntil && user.breakUntil.getTime() > this.now()) throw new TradeError("on_break");
   }
 
   async listPositions(userId: number, scope: "open" | "history", limit = 50): Promise<Position[]> {
@@ -204,6 +222,7 @@ export class TradingEngine {
 
     const { row, balance } = await this.db.transaction(async (tx) => {
       const user = await this.lockUser(tx, userId);
+      this.checkBreak(user);
       if (!isCoinUnlocked(coin, user.level)) throw new TradeError("coin_locked");
       if (!checkLeverage(req.leverage, user.level).ok) throw new TradeError("bad_leverage");
 
@@ -216,7 +235,7 @@ export class TradingEngine {
       const notional = req.margin * req.leverage;
       const entry = fillPrice(req.side, "open", ticker.last, notional, e.slippageReduction);
       const quantity = notional / entry;
-      const fee = notional * s.takerFeeRate * (1 - e.feeDiscount);
+      const fee = notional * s.takerFeeRate * this.feeMul(e, req.symbol);
       if (req.margin + fee > user.balance + 1e-9) throw new TradeError("insufficient_balance");
 
       const liq = liquidationPrice(req.side, entry, req.leverage);
@@ -366,6 +385,7 @@ export class TradingEngine {
 
     const { row, balance } = await this.db.transaction(async (tx) => {
       const user = await this.lockUser(tx, userId);
+      this.checkBreak(user);
       if (!isCoinUnlocked(coin, user.level)) throw new TradeError("coin_locked");
       if (!checkLeverage(req.leverage, user.level).ok) throw new TradeError("bad_leverage");
       const [pending] = await tx
@@ -378,7 +398,7 @@ export class TradingEngine {
       const sl = req.stopLoss ?? null;
       validateProtection(req.side, price, liquidationPrice(req.side, price, req.leverage), tp, sl);
 
-      const reserved = req.margin + req.margin * req.leverage * s.takerFeeRate * (1 - e.feeDiscount);
+      const reserved = req.margin + req.margin * req.leverage * s.takerFeeRate * this.feeMul(e, req.symbol);
       if (reserved > user.balance + 1e-9) throw new TradeError("insufficient_balance");
       const balance = user.balance - reserved;
       await tx.update(users).set({ balance }).where(eq(users.id, userId));
@@ -535,7 +555,7 @@ export class TradingEngine {
         let closeFee = 0;
         if (reason !== "liquidation") {
           const pnl = unrealizedPnl(pos.side, pos.entryPrice, exitPrice, pos.quantity);
-          closeFee = pos.quantity * exitPrice * s.takerFeeRate * (1 - e.feeDiscount);
+          closeFee = pos.quantity * exitPrice * s.takerFeeRate * this.feeMul(e, pos.symbol);
           payout = Math.max(0, pos.margin + pnl - closeFee);
         }
         const balance = user.balance + payout;
@@ -646,7 +666,7 @@ export class TradingEngine {
         const entry =
           order.type === "limit" ? order.price : fillPrice(order.side, "open", mark, notional, e.slippageReduction);
         const rate = order.type === "limit" ? Math.min(MAKER_FEE_RATE, s.takerFeeRate) : s.takerFeeRate;
-        const fee = notional * rate * (1 - e.feeDiscount);
+        const fee = notional * rate * this.feeMul(e, order.symbol);
         const liq = liquidationPrice(order.side, entry, order.leverage);
         // Стоп мог исполниться с проскальзыванием: защиту, ставшую неверной, снимаем
         const tp = protectionValid(order.side, entry, liq, order.takeProfit, null) ? order.takeProfit : null;

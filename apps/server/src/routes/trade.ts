@@ -148,6 +148,21 @@ export async function tradeRoutes(
     return { rpg: await engine.rpg.upgradeSkill(req.tgUser!.id, id) };
   });
 
+  // ---------- Рейтинг и тильт ----------
+
+  const leaderboardQuery = z.object({ period: z.enum(["day", "week", "all"]).default("day") });
+
+  app.get("/leaderboard", { preHandler: player }, async (req) => {
+    const { period } = leaderboardQuery.parse(req.query);
+    return engine.leaderboard.get(period, req.tgUser!.id);
+  });
+
+  app.post("/break", { preHandler: guard }, async (req) => ({ tilt: await engine.progress.startBreak(req.tgUser!.id) }));
+
+  app.post("/break/claim", { preHandler: guard }, async (req) => ({
+    tilt: await engine.progress.claimBreak(req.tgUser!.id),
+  }));
+
   app.post("/loan", { preHandler: guard }, async (req) => {
     return { balance: await engine.takeLoan(req.tgUser!.id) };
   });

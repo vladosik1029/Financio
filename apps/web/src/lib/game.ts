@@ -1,4 +1,4 @@
-import { COINS, unrealizedPnl, type EffectKey, type Effects, type Position, type Profile, type Ticker } from "@financio/shared";
+import { BREAK_BONUS, BREAK_XP, COINS, unrealizedPnl, type EffectKey, type Effects, type Position, type Profile, type Ticker } from "@financio/shared";
 
 /** Ранг трейдера по уровню: ключ перевода ranks.* */
 export function rankKey(level: number): string {
@@ -70,6 +70,8 @@ export interface MentorTip {
   params?: Record<string, string | number>;
   /** warn — предупреждение (тильт, ликвидация), tip — совет */
   tone: "warn" | "tip";
+  /** Кнопка под репликой: начать перерыв или забрать награду за него */
+  action?: "break" | "claim";
 }
 
 const GENERAL_TIPS = ["riskPerTrade", "trend", "limitOrders", "funding", "patience"];
@@ -84,7 +86,12 @@ export function mentorTip(profile: Profile, open: Position[], history: Position[
   if (last?.closeReason === "liquidation" && now - (last.closedAt ?? 0) < 3600_000) {
     return { key: "afterLiquidation", params: { lev: last.leverage }, tone: "warn" };
   }
+  if (profile.tilt.claimable) return { key: "breakDone", params: { xp: BREAK_XP, amount: BREAK_BONUS }, tone: "tip", action: "claim" };
+  if (profile.tilt.breakUntil) return { key: "onBreak", tone: "tip" };
   const streak = lossStreak(history);
+  if (profile.tilt.eligible) {
+    return { key: "tiltBreak", params: { n: streak, xp: BREAK_XP, amount: BREAK_BONUS }, tone: "warn", action: "break" };
+  }
   if (streak >= 3) return { key: "tilt", params: { n: streak }, tone: "warn" };
   if (history.length === 0 && open.length === 0) return { key: "welcome", tone: "tip" };
   const unprotected = open.filter((p) => p.stopLoss == null);

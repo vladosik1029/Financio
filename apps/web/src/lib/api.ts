@@ -7,6 +7,9 @@ import type {
   Position,
   Profile,
   RpgState,
+  Leaderboard,
+  LeaderboardPeriod,
+  TiltState,
   Ticker,
   Timeframe,
   TimeframeId,
@@ -107,6 +110,9 @@ export const api = {
   equip: (id: string) => request<{ rpg: RpgState }>("POST", `/items/${id}/equip`),
   unequip: (id: string) => request<{ rpg: RpgState }>("POST", `/items/${id}/unequip`),
   upgradeSkill: (id: string) => request<{ rpg: RpgState }>("POST", `/skills/${id}/upgrade`),
+  leaderboard: (period: LeaderboardPeriod) => get<Leaderboard>(`/leaderboard?period=${period}`),
+  startBreak: () => request<{ tilt: TiltState }>("POST", "/break"),
+  claimBreak: () => request<{ tilt: TiltState }>("POST", "/break/claim"),
 };
 
 /** Админка из MiniApp: сервер пускает по Telegram ID из ADMIN_TELEGRAM_IDS */

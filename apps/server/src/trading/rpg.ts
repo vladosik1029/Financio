@@ -23,6 +23,7 @@ export class RpgService {
   constructor(
     private readonly db: Db,
     private readonly notify: Notify,
+    private readonly onChanged: (userId: number, state: RpgState) => void = () => {},
   ) {}
 
   async effects(userId: number): Promise<Effects> {
@@ -143,6 +144,7 @@ export class RpgService {
     this.cache.delete(userId);
     const state = await this.state(userId);
     this.notify(userId, { type: "rpg", state });
+    this.onChanged(userId, state);
     return state;
   }
 }

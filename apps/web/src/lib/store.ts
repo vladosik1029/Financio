@@ -1,4 +1,4 @@
-import { NO_EFFECTS, type Order, type OrderEvent, type Position, type Profile, type RpgState, type ServerMessage, type TimeframeId } from "@financio/shared";
+import { currentOrNextEvent, NO_EFFECTS, type Order, type OrderEvent, type Position, type Profile, type RpgState, type ServerMessage, type TimeframeId } from "@financio/shared";
 import { create } from "zustand";
 import { api } from "./api";
 
@@ -64,6 +64,9 @@ const DEFAULT_PROFILE: Profile = {
   loanAmount: 500,
   quests: [],
   rpg: { owned: [], equipped: {}, skills: {}, skillPoints: 0, effects: { ...NO_EFFECTS } },
+  achievements: [],
+  tilt: { eligible: false, breakUntil: null, claimable: false },
+  event: currentOrNextEvent(Date.now()),
 };
 
 export const useApp = create<AppState>((set, get) => ({
@@ -136,8 +139,13 @@ export const useApp = create<AppState>((set, get) => ({
   applyProgress(msg) {
     set({ profile: { ...get().profile, level: msg.level, xp: msg.xp, xpToNext: msg.xpToNext } });
     get().showToast({
-      key: msg.reason === "quest" ? "progress.quest" : "progress.trade",
-      params: { xp: msg.gained, quest: msg.questId ?? "" },
+      key: `progress.${msg.reason}`,
+      params: {
+        xp: msg.gained,
+        quest: msg.reason === "quest" ? (msg.ref ?? "") : "",
+        achievement: msg.reason === "achievement" ? (msg.ref ?? "") : "",
+        event: msg.reason === "event" ? (msg.ref ?? "") : "",
+      },
     });
     const level = msg.levelsGained[msg.levelsGained.length - 1];
     if (level) set({ levelUp: { level, bonus: msg.bonus } });

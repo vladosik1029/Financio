@@ -13,23 +13,8 @@ import { formatPercent, formatPrice } from "../lib/format";
 import { useMarket } from "../lib/market";
 import { useApp } from "../lib/store";
 import { haptic } from "../lib/telegram";
-
-function useNow(intervalMs: number): number {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs]);
-  return now;
-}
-
-function countdown(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  const hh = String(Math.floor(s / 3600)).padStart(2, "0");
-  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
-  const ss = String(s % 60).padStart(2, "0");
-  return `${hh}:${mm}:${ss}`;
-}
+import { clock, useNow } from "../lib/useNow";
+import { EventBanner } from "../components/EventBanner";
 
 /** Цвет цены по направлению последнего тика, как в стакане биржи */
 function useTickDirection(price: number | undefined): "up" | "down" | "" {
@@ -45,6 +30,7 @@ function useTickDirection(price: number | undefined): "up" | "down" | "" {
 export function TradeScreen() {
   const { t } = useTranslation();
   const { symbol, tf, open, orders } = useApp();
+  const breakUntil = useApp((s) => s.profile.tilt.breakUntil);
   const { tickers, stale, connected } = useMarket();
   const ticker = tickers[symbol];
   const coin = getCoin(symbol)!;
@@ -77,12 +63,16 @@ export function TradeScreen() {
         <div>
           <span className="muted">{t("market.funding")}</span>
           <span className="mono">
-            {ticker ? `${formatPercent(ticker.fundingRate)} · ${countdown(ticker.nextFundingTime - now)}` : "—"}
+            {ticker ? `${formatPercent(ticker.fundingRate)} · ${clock(ticker.nextFundingTime - now)}` : "—"}
           </span>
         </div>
       </div>
       {!connected && <div className="banner">{t("market.offline")}</div>}
       {connected && stale && <div className="banner">{t("market.stale")}</div>}
+      {breakUntil && breakUntil > now && (
+        <div className="banner">{t("tilt.onBreakBanner", { time: clock(breakUntil - now) })}</div>
+      )}
+      <EventBanner compact />
 
       <TimeframeTabs />
       <PriceChart symbol={symbol} tf={tf} />

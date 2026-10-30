@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { activeEvent, currentOrNextEvent, EVENT_DURATION_MS, EVENT_SLOT_MS, eventForSlot, MARKET_EVENTS } from "./events.js";
 import { addXp, dailyQuests, QUEST_POOL, tradeXp } from "./progress.js";
 
 const base = { openedAt: 0, closedAt: 60_000, invested: 100, closeReason: "manual" as const };
@@ -35,5 +36,19 @@ describe("квесты дня", () => {
   it("сменяются от дня к дню", () => {
     const sets = new Set(Array.from({ length: 30 }, (_, i) => dailyQuests(day + i * 86_400_000).map((q) => q.id).join()));
     expect(sets.size).toBeGreaterThan(10);
+  });
+});
+
+describe("рыночные события", () => {
+  it("одно событие на слот, 30 минут, с монетой из своего списка", () => {
+    for (let slot = 1000; slot < 1100; slot++) {
+      const e = eventForSlot(slot);
+      expect(e.endsAt - e.startsAt).toBe(EVENT_DURATION_MS);
+      expect(Math.floor(e.startsAt / EVENT_SLOT_MS)).toBe(slot);
+      expect(MARKET_EVENTS.find((d) => d.id === e.id)?.coins).toContain(e.symbol);
+      expect(activeEvent(e.startsAt + 1)).toEqual(e);
+      expect(activeEvent(e.endsAt)).toBeNull();
+      expect(currentOrNextEvent(e.endsAt)).toEqual(eventForSlot(slot + 1));
+    }
   });
 });

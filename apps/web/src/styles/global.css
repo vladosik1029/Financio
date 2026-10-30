@@ -1172,3 +1172,125 @@ h3 {
   flex: 0 0 auto;
   padding: 8px 12px;
 }
+
+/* Рыночные события */
+.event-banner {
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--brand-grad);
+  color: var(--brand-ink);
+  text-align: left;
+}
+.event-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.event-effect {
+  margin-top: 6px;
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.18);
+  font-weight: 600;
+}
+.event-next {
+  margin: 10px 0 0;
+}
+.mentor-body {
+  flex: 1;
+  min-width: 0;
+}
+.mentor-action {
+  margin-top: 10px;
+}
+
+/* Рейтинг */
+.lb {
+  margin-top: 12px;
+  padding: 4px 14px;
+}
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.lb-row:last-child {
+  border-bottom: none;
+}
+.lb-row.me .lb-name > div:first-child {
+  color: var(--brand);
+  font-weight: 600;
+}
+.lb-rank {
+  width: 26px;
+  text-align: center;
+  color: var(--muted);
+}
+.lb-rank.top1 {
+  color: var(--gold);
+  font-weight: 700;
+}
+.lb-rank.top2 {
+  color: #d9d2cc;
+  font-weight: 700;
+}
+.lb-rank.top3 {
+  color: #d08a5a;
+  font-weight: 700;
+}
+.lb-name {
+  flex: 1;
+  min-width: 0;
+}
+.lb-gap {
+  text-align: center;
+  color: var(--muted);
+}
+
+/* Достижения */
+.badges {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.badge {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  opacity: 0.55;
+}
+.badge.got {
+  opacity: 1;
+  border-color: var(--gold);
+}
+.badge-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.badge.got .badge-icon {
+  background: var(--gold);
+  color: var(--bg);
+}
+.badge-name {
+  margin-top: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.badge-xp {
+  margin-top: 4px;
+  color: var(--gold);
+}
