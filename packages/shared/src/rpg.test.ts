@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeEffects, ITEMS, SKILLS, skillPointsForLevel } from "./rpg.js";
+import { computeEffects, ITEM_SLOTS, ITEMS, SKILLS, skillPointsForLevel } from "./rpg.js";
 
 describe("RPG", () => {
   it("складывает эффекты вещей и рангов навыков", () => {
@@ -18,6 +18,12 @@ describe("RPG", () => {
 
   it("каталоги без дублей id", () => {
     expect(new Set(ITEMS.map((i) => i.id)).size).toBe(ITEMS.length);
+    // В каждом слоте есть вещь с первых уровней и легендарная на потом
+    for (const slot of ITEM_SLOTS) {
+      const items = ITEMS.filter((i) => i.slot === slot);
+      expect(Math.min(...items.map((i) => i.minLevel))).toBeLessThanOrEqual(3);
+      expect(items.some((i) => i.rarity === "legendary")).toBe(true);
+    }
     expect(new Set(SKILLS.map((s) => s.id)).size).toBe(SKILLS.length);
     expect(skillPointsForLevel(1)).toBe(0);
     expect(skillPointsForLevel(5)).toBe(4);

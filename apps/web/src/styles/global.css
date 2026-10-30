@@ -1294,3 +1294,6 @@ h3 {
   margin-top: 4px;
   color: var(--gold);
 }
+.rarity-legendary {
+  --rarity: #ffc23d;
+}
