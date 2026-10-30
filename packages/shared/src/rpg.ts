@@ -37,10 +37,10 @@ export const EFFECT_CAPS: Effects = {
   extraPositions: 10,
 };
 
-export type ItemSlot = "monitor" | "chair" | "keyboard" | "talisman";
-export const ITEM_SLOTS: readonly ItemSlot[] = ["monitor", "chair", "keyboard", "talisman"];
+export type ItemSlot = "monitor" | "chair" | "keyboard" | "talisman" | "outfit" | "gadget";
+export const ITEM_SLOTS: readonly ItemSlot[] = ["outfit", "monitor", "chair", "keyboard", "talisman", "gadget"];
 
-export type Rarity = "common" | "rare" | "epic";
+export type Rarity = "common" | "rare" | "epic" | "legendary";
 
 export interface ItemDef {
   id: string;
@@ -51,20 +51,47 @@ export interface ItemDef {
   effects: Partial<Effects>;
 }
 
-/** Каталог магазина. Название и описание — в переводах items.<id> */
+/**
+ * Каталог магазина: в каждом слоте вещи от первого уровня до легендарных.
+ * Название и описание — в переводах items.<id>, картинка — assets/avatar/<slot>-<id>.svg.
+ */
 export const ITEMS: readonly ItemDef[] = [
+  // Одежда персонажа
+  { id: "hoodie", slot: "outfit", rarity: "common", price: 150, minLevel: 1, effects: { xpBonus: 0.03 } },
+  { id: "crypto_tee", slot: "outfit", rarity: "common", price: 400, minLevel: 3, effects: { loanBonus: 0.15 } },
+  { id: "blazer", slot: "outfit", rarity: "rare", price: 1600, minLevel: 7, effects: { feeDiscount: 0.06, xpBonus: 0.03 } },
+  { id: "suit", slot: "outfit", rarity: "epic", price: 5000, minLevel: 14, effects: { feeDiscount: 0.1, xpBonus: 0.08 } },
+  { id: "whale_suit", slot: "outfit", rarity: "legendary", price: 16000, minLevel: 24, effects: { feeDiscount: 0.12, xpBonus: 0.15 } },
+  // Мониторы
   { id: "second_monitor", slot: "monitor", rarity: "common", price: 300, minLevel: 1, effects: { feeDiscount: 0.05 } },
   { id: "ultrawide", slot: "monitor", rarity: "rare", price: 1500, minLevel: 5, effects: { feeDiscount: 0.1 } },
+  { id: "vertical_duo", slot: "monitor", rarity: "rare", price: 3000, minLevel: 9, effects: { feeDiscount: 0.12, xpBonus: 0.03 } },
   { id: "trading_wall", slot: "monitor", rarity: "epic", price: 6000, minLevel: 15, effects: { feeDiscount: 0.2, xpBonus: 0.05 } },
+  { id: "holo_display", slot: "monitor", rarity: "legendary", price: 15000, minLevel: 25, effects: { feeDiscount: 0.25, xpBonus: 0.1 } },
+  // Кресла
   { id: "office_chair", slot: "chair", rarity: "common", price: 200, minLevel: 1, effects: { xpBonus: 0.05 } },
+  { id: "beanbag", slot: "chair", rarity: "common", price: 600, minLevel: 3, effects: { xpBonus: 0.06, loanBonus: 0.1 } },
   { id: "gaming_chair", slot: "chair", rarity: "rare", price: 1200, minLevel: 4, effects: { xpBonus: 0.1 } },
   { id: "pilot_chair", slot: "chair", rarity: "epic", price: 4000, minLevel: 10, effects: { xpBonus: 0.2 } },
+  { id: "throne", slot: "chair", rarity: "legendary", price: 12000, minLevel: 22, effects: { xpBonus: 0.3, extraPositions: 1 } },
+  // Клавиатуры
   { id: "mech_keyboard", slot: "keyboard", rarity: "common", price: 500, minLevel: 3, effects: { slippageReduction: 0.25 } },
   { id: "macro_pad", slot: "keyboard", rarity: "rare", price: 1800, minLevel: 6, effects: { slippageReduction: 0.45 } },
   { id: "pro_terminal", slot: "keyboard", rarity: "epic", price: 5000, minLevel: 12, effects: { slippageReduction: 0.6, feeDiscount: 0.05 } },
+  { id: "golden_keyboard", slot: "keyboard", rarity: "legendary", price: 9000, minLevel: 20, effects: { slippageReduction: 0.75, feeDiscount: 0.08 } },
+  // Талисманы
+  { id: "rubber_duck", slot: "talisman", rarity: "common", price: 100, minLevel: 1, effects: { loanBonus: 0.1 } },
   { id: "lucky_coin", slot: "talisman", rarity: "common", price: 400, minLevel: 2, effects: { loanBonus: 0.2 } },
   { id: "bull_figurine", slot: "talisman", rarity: "rare", price: 2500, minLevel: 8, effects: { extraPositions: 2 } },
   { id: "golden_bull", slot: "talisman", rarity: "epic", price: 7500, minLevel: 18, effects: { extraPositions: 3, xpBonus: 0.1 } },
+  { id: "diamond_hands", slot: "talisman", rarity: "legendary", price: 20000, minLevel: 28, effects: { extraPositions: 4, xpBonus: 0.15 } },
+  // Приколюхи на столе и в комнате
+  { id: "coffee_mug", slot: "gadget", rarity: "common", price: 80, minLevel: 1, effects: { xpBonus: 0.02 } },
+  { id: "rgb_lamp", slot: "gadget", rarity: "common", price: 350, minLevel: 2, effects: { xpBonus: 0.04 } },
+  { id: "coffee_machine", slot: "gadget", rarity: "rare", price: 1200, minLevel: 6, effects: { xpBonus: 0.08 } },
+  { id: "office_cat", slot: "gadget", rarity: "rare", price: 2200, minLevel: 9, effects: { loanBonus: 0.3, xpBonus: 0.05 } },
+  { id: "mining_rig", slot: "gadget", rarity: "epic", price: 6500, minLevel: 16, effects: { extraPositions: 1, feeDiscount: 0.05 } },
+  { id: "rocket_model", slot: "gadget", rarity: "legendary", price: 14000, minLevel: 26, effects: { xpBonus: 0.15, extraPositions: 2 } },
 ];
 
 export interface SkillDef {

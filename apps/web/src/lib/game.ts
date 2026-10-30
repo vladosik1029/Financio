@@ -1,4 +1,4 @@
-import { BREAK_BONUS, BREAK_XP, COINS, unrealizedPnl, type EffectKey, type Effects, type Position, type Profile, type Ticker } from "@financio/shared";
+import { BREAK_BONUS, BREAK_XP, maxLeverageForLevel, unrealizedPnl, type EffectKey, type Effects, type Position, type Profile, type Ticker } from "@financio/shared";
 
 /** Ранг трейдера по уровню: ключ перевода ranks.* */
 export function rankKey(level: number): string {
@@ -99,8 +99,11 @@ export function mentorTip(profile: Profile, open: Position[], history: Position[
   if (open.some((p) => p.leverage >= 50)) return { key: "highLeverage", tone: "warn" };
   const quest = profile.quests.find((q) => !q.done);
   if (quest) return { key: "quest", params: { quest: quest.id, xp: quest.xp }, tone: "tip" };
-  const nextCoin = COINS.find((c) => c.minLevel > profile.level);
-  if (nextCoin) return { key: "nextUnlock", params: { coin: nextCoin.base, level: nextCoin.minLevel }, tone: "tip" };
+  // Ближайший уровень, на котором вырастет максимальное плечо
+  const max = maxLeverageForLevel(profile.level);
+  let next = profile.level + 1;
+  while (next <= 100 && maxLeverageForLevel(next) === max) next++;
+  if (next <= 100) return { key: "nextUnlock", params: { lev: maxLeverageForLevel(next), level: next }, tone: "tip" };
   const day = Math.floor(now / 86_400_000);
   return { key: `tips.${GENERAL_TIPS[day % GENERAL_TIPS.length]}`, tone: "tip" };
 }

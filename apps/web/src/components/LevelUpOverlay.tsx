@@ -1,4 +1,4 @@
-import { COINS, maxLeverageForLevel } from "@financio/shared";
+import { COINS, ITEMS, maxLeverageForLevel } from "@financio/shared";
 import { useTranslation } from "react-i18next";
 import { formatUsd } from "../lib/format";
 import { rankKey } from "../lib/game";
@@ -11,6 +11,7 @@ export function LevelUpOverlay() {
   if (!levelUp) return null;
   const { level, bonus } = levelUp;
   const coins = COINS.filter((c) => c.minLevel === level).map((c) => c.base);
+  const items = ITEMS.filter((i) => i.minLevel === level).map((i) => t(`items.${i.id}.name`));
   const leverageUp = maxLeverageForLevel(level) > maxLeverageForLevel(level - 1);
   const rankUp = rankKey(level) !== rankKey(level - 1);
 
@@ -23,6 +24,7 @@ export function LevelUpOverlay() {
         {bonus > 0 && <p className="up mono">{t("levelUp.bonus", { amount: formatUsd(bonus) })}</p>}
         {coins.length > 0 && <p>{t("levelUp.coins", { coins: coins.join(", ") })}</p>}
         {leverageUp && <p>{t("levelUp.leverage", { max: maxLeverageForLevel(level) })}</p>}
+        {items.length > 0 && <p>{t("levelUp.items", { items: items.join(", ") })}</p>}
         <button className="btn btn-brand" onClick={dismissLevelUp}>
           {t("levelUp.ok")}
         </button>

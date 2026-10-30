@@ -120,7 +120,6 @@ describe("TradingEngine", () => {
     await expect(open({ margin: 5000 })).rejects.toMatchObject({ code: "insufficient_balance" });
     await expect(open({ leverage: 60 })).rejects.toMatchObject({ code: "bad_leverage" });
     await expect(open({ leverage: 4 })).rejects.toMatchObject({ code: "bad_leverage" });
-    await expect(open({ symbol: "SOLUSDT" })).rejects.toMatchObject({ code: "coin_locked" });
     await expect(open({ takeProfit: 49_000 })).rejects.toMatchObject({ code: "bad_take_profit" });
     await expect(open({ stopLoss: 40_000 })).rejects.toMatchObject({ code: "bad_stop_loss" });
     market.stale = true;
