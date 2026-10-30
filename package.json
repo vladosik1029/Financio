@@ -1,0 +1,24 @@
+{
+  "name": "financio",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter ./apps/** dev",
+    "dev:server": "pnpm --filter @financio/server dev",
+    "dev:web": "pnpm --filter @financio/web dev",
+    "dev:bot": "pnpm --filter @financio/bot dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
