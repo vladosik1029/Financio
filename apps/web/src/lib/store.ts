@@ -2,7 +2,7 @@ import type { Position, Profile, TimeframeId } from "@financio/shared";
 import { create } from "zustand";
 import { api } from "./api";
 
-export type Tab = "trade" | "portfolio" | "career" | "rating" | "profile";
+export type Tab = "home" | "trade" | "portfolio" | "rating" | "profile" | "admin";
 
 /** Событие, которое показываем поверх экрана: ликвидация, TP или SL */
 export interface Alert {
@@ -16,6 +16,7 @@ interface AppState {
   name: string;
   /** Есть ли связь с игровым сервером (без неё работает только просмотр графика) */
   online: boolean;
+  isAdmin: boolean;
   profile: Profile;
   open: Position[];
   history: Position[];
@@ -45,11 +46,12 @@ const DEFAULT_PROFILE: Profile = {
 };
 
 export const useApp = create<AppState>((set, get) => ({
-  tab: "trade",
+  tab: "home",
   symbol: "BTCUSDT",
   tf: "10s",
   name: "Trader",
   online: false,
+  isAdmin: false,
   profile: DEFAULT_PROFILE,
   open: [],
   history: [],
@@ -61,7 +63,13 @@ export const useApp = create<AppState>((set, get) => ({
   async refresh() {
     try {
       const [me, open] = await Promise.all([api.me(), api.positions("open")]);
-      set({ name: me.user.first_name, profile: me.profile, open: open.positions, online: true });
+      set({
+        name: me.user.first_name,
+        profile: me.profile,
+        isAdmin: me.isAdmin ?? false,
+        open: open.positions,
+        online: true,
+      });
     } catch {
       set({ online: false });
     }

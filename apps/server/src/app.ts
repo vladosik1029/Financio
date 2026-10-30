@@ -19,6 +19,8 @@ export interface AppDeps {
   channels: UserChannels;
   corsOrigins: string[];
   adminToken: string;
+  /** Telegram ID админов: им админка доступна прямо из MiniApp */
+  adminIds: number[];
 }
 
 export async function buildApp(deps: AppDeps) {
@@ -30,7 +32,7 @@ export async function buildApp(deps: AppDeps) {
   });
   await app.register(websocket);
   await app.register(apiRoutes, { prefix: "/api", hub: deps.hub });
-  await app.register(tradeRoutes, { prefix: "/api", engine: deps.engine });
+  await app.register(tradeRoutes, { prefix: "/api", engine: deps.engine, adminIds: deps.adminIds });
   await app.register(adminRoutes, {
     prefix: "/api/admin",
     db: deps.db,
@@ -38,6 +40,7 @@ export async function buildApp(deps: AppDeps) {
     settings: deps.settings,
     hub: deps.hub,
     token: deps.adminToken,
+    adminIds: deps.adminIds,
   });
   await app.register(adminPage, { enabled: !!deps.adminToken });
   await app.register(wsRoutes, { hub: deps.hub, channels: deps.channels });

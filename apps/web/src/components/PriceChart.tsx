@@ -14,6 +14,7 @@ import { useEffect, useRef } from "react";
 import { api } from "../lib/api";
 import { marketSocket } from "../lib/market";
 import { useApp } from "../lib/store";
+import { theme } from "../lib/theme";
 
 /** Lightweight Charts рисует время в UTC, поэтому сдвигаем его в часовой пояс игрока */
 const TZ_OFFSET_SEC = -new Date().getTimezoneOffset() * 60;
@@ -33,22 +34,22 @@ export function PriceChart({ symbol, tf }: { symbol: string; tf: TimeframeId }) 
     const chart = createChart(containerRef.current!, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: "#0b0e14" },
-        textColor: "#8b93a7",
+        background: { type: ColorType.Solid, color: theme.bg },
+        textColor: theme.muted,
         fontFamily: "JetBrains Mono, ui-monospace, monospace",
         attributionLogo: true,
       },
-      grid: { vertLines: { color: "#161b26" }, horzLines: { color: "#161b26" } },
+      grid: { vertLines: { color: theme.grid }, horzLines: { color: theme.grid } },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: "#1f2633" },
-      timeScale: { borderColor: "#1f2633", timeVisible: true, secondsVisible: true, rightOffset: 4 },
+      rightPriceScale: { borderColor: theme.border },
+      timeScale: { borderColor: theme.border, timeVisible: true, secondsVisible: true, rightOffset: 4 },
     });
     seriesRef.current = chart.addSeries(CandlestickSeries, {
-      upColor: "#16c784",
-      downColor: "#ea3943",
+      upColor: theme.up,
+      downColor: theme.down,
       borderVisible: false,
-      wickUpColor: "#16c784",
-      wickDownColor: "#ea3943",
+      wickUpColor: theme.up,
+      wickDownColor: theme.down,
     });
     chartRef.current = chart;
     return () => {
@@ -113,10 +114,10 @@ export function PriceChart({ symbol, tf }: { symbol: string; tf: TimeframeId }) 
           series.createPriceLine({ price, color, title, lineWidth: 1, lineStyle: style, axisLabelVisible: true }),
         );
       };
-      add(p.entryPrice, p.side === "long" ? "#16c784" : "#ea3943", `${p.side === "long" ? "L" : "S"} ${p.leverage}x`, LineStyle.Solid);
-      add(p.liquidationPrice, "#f5b942", "LIQ");
-      add(p.takeProfit, "#16c784", "TP");
-      add(p.stopLoss, "#ea3943", "SL");
+      add(p.entryPrice, p.side === "long" ? theme.up : theme.down, `${p.side === "long" ? "L" : "S"} ${p.leverage}x`, LineStyle.Solid);
+      add(p.liquidationPrice, theme.brand, "LIQ");
+      add(p.takeProfit, theme.up, "TP");
+      add(p.stopLoss, theme.down, "SL");
     }
   }, [positions, symbol]);
 

@@ -38,6 +38,7 @@ describe("API", () => {
       channels: new UserChannels(),
       corsOrigins: [],
       adminToken: "test-admin-token-123456",
+      adminIds: [42],
     });
   });
   afterAll(async () => {
@@ -132,6 +133,16 @@ describe("API", () => {
       payload: { symbol: "BTCUSDT", side: "long", margin: 10, leverage: 10 },
     });
     expect(blocked.json()).toEqual({ error: "trading_disabled" });
+  });
+
+  it("пускает в админку из MiniApp только админов по Telegram ID", async () => {
+    const admin = await app.inject({ url: "/api/me", headers: tma(42) });
+    expect(admin.json().isAdmin).toBe(true);
+    expect((await app.inject({ url: "/api/me", headers: tma(10) })).json().isAdmin).toBe(false);
+
+    expect((await app.inject({ url: "/api/admin/stats", headers: tma(42) })).statusCode).toBe(200);
+    expect((await app.inject({ url: "/api/admin/stats", headers: tma(10) })).statusCode).toBe(403);
+    expect((await app.inject({ url: "/api/admin/stats", headers: { authorization: "tma bad" } })).statusCode).toBe(401);
   });
 
   it("отдаёт страницу админки", async () => {

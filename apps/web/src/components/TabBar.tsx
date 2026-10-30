@@ -1,31 +1,31 @@
 import { useTranslation } from "react-i18next";
 import { haptic } from "../lib/telegram";
 import { useApp, type Tab } from "../lib/store";
+import { Icon } from "./Icon";
 
-const TABS: { id: Tab; icon: string }[] = [
-  { id: "trade", icon: "📈" },
-  { id: "portfolio", icon: "💼" },
-  { id: "career", icon: "⭐" },
-  { id: "rating", icon: "🏆" },
-  { id: "profile", icon: "👤" },
-];
+const TABS: Tab[] = ["home", "trade", "portfolio", "rating", "profile"];
+const ADMIN_TABS: Tab[] = [...TABS, "admin"];
 
 export function TabBar() {
   const { t } = useTranslation();
-  const { tab, setTab } = useApp();
+  const { tab, setTab, open, isAdmin } = useApp();
+  const tabs = isAdmin ? ADMIN_TABS : TABS;
   return (
-    <nav className="tabbar">
-      {TABS.map((item) => (
+    <nav className="tabbar" style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}>
+      {tabs.map((id) => (
         <button
-          key={item.id}
-          className={item.id === tab ? "tab active" : "tab"}
+          key={id}
+          className={id === tab ? "tab active" : "tab"}
           onClick={() => {
             haptic.tap();
-            setTab(item.id);
+            setTab(id);
           }}
         >
-          <span className="tab-icon">{item.icon}</span>
-          <span>{t(`tabs.${item.id}`)}</span>
+          <span className="tab-icon">
+            <Icon name={id} size={22} />
+            {id === "portfolio" && open.length > 0 && <span className="tab-badge">{open.length}</span>}
+          </span>
+          <span>{t(`tabs.${id}`)}</span>
         </button>
       ))}
     </nav>

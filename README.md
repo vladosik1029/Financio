@@ -38,7 +38,7 @@ packages/
 
 **База данных.** По умолчанию встроенный PostgreSQL ([PGlite](https://pglite.dev)) в папке `apps/server/data`: отдельный сервер базы не нужен. Когда игроков станет много, достаточно указать `DATABASE_URL=postgres://...` и поднять сервис `postgres` (`docker compose --profile db up -d`). Миграции применяются при старте сервера, новые создаются командой `pnpm --filter @financio/server db:generate`.
 
-**Админка** открывается по адресу `https://<домен>/admin` и пускает по паролю `ADMIN_TOKEN`. В ней видно сводку, игроков, их позиции и журнал операций. Можно менять баланс, банить, принудительно закрывать позиции и настраивать комиссии, стартовый баланс, лимит позиций, кредит, а также выключать торговлю.
+**Админка** открывается вкладкой «Админ» прямо в MiniApp у игроков, чьи Telegram ID перечислены в `ADMIN_TELEGRAM_IDS`. Для обычного браузера есть страница `https://<домен>/admin` с паролем `ADMIN_TOKEN`. В ней видно сводку, игроков, их позиции и журнал операций. Можно менять баланс, банить, принудительно закрывать позиции и настраивать комиссии, стартовый баланс, лимит позиций, кредит, а также выключать торговлю.
 
 **Монеты:** BTC, ETH (с 1 уровня), SOL, BNB, XRP, DOGE, TON, LINK (с 5 уровня).
 
@@ -89,7 +89,8 @@ pnpm build
 | `VITE_API_URL` | web | Адрес API. Пусто в проде (тот же домен), локально `http://localhost:8080` |
 | `WEBAPP_URL` | bot | HTTPS-адрес опубликованного MiniApp |
 | `DATABASE_URL` | server | `pglite://./data/pglite` (по умолчанию), `pglite://memory` или `postgres://...` |
-| `ADMIN_TOKEN` | server | Пароль админки, не короче 16 символов. Пусто — админка выключена |
+| `ADMIN_TELEGRAM_IDS` | server | Telegram ID админов через запятую: им в MiniApp видна вкладка «Админ» |
+| `ADMIN_TOKEN` | server | Пароль страницы `/admin`, не короче 16 символов. Пусто — страница выключена |
 
 ## Деплой
 
@@ -111,6 +112,6 @@ pnpm build
 | POST | `/api/positions/:id/margin` | Добавить маржу: `{amount}` |
 | POST | `/api/loan` | Взять кредит наставника |
 | WS | `/ws?auth=<initData>` | Тикеры раз в секунду; свечи по подписке `{"type":"subscribe","symbol":"BTCUSDT","tf":"10s"}`; личные события `position` и `balance` |
-| — | `/api/admin/*` | API админки, заголовок `Authorization: Bearer <ADMIN_TOKEN>` |
+| — | `/api/admin/*` | API админки: `Authorization: tma <initData>` админа из `ADMIN_TELEGRAM_IDS` или `Bearer <ADMIN_TOKEN>` |
 
 Ошибки торговли приходят как `{"error": "<код>"}` с кодами из `TradeErrorCode` в `packages/shared/src/types.ts`.

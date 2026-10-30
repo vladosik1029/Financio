@@ -1,7 +1,8 @@
 import { getCoin } from "@financio/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CoinBar } from "../components/CoinBar";
+import { CoinSheet } from "../components/CoinSheet";
+import { Icon } from "../components/Icon";
 import { LoanBanner } from "../components/LoanBanner";
 import { OpenPositionCard } from "../components/PositionCard";
 import { PriceChart } from "../components/PriceChart";
@@ -10,6 +11,7 @@ import { TradePanel } from "../components/TradePanel";
 import { formatPercent, formatPrice } from "../lib/format";
 import { useMarket } from "../lib/market";
 import { useApp } from "../lib/store";
+import { haptic } from "../lib/telegram";
 
 function useNow(intervalMs: number): number {
   const [now, setNow] = useState(Date.now());
@@ -28,6 +30,17 @@ function countdown(ms: number): string {
   return `${hh}:${mm}:${ss}`;
 }
 
+/** Цвет цены по направлению последнего тика, как в стакане биржи */
+function useTickDirection(price: number | undefined): "up" | "down" | "" {
+  const prev = useRef<number | undefined>(undefined);
+  const [dir, setDir] = useState<"up" | "down" | "">("");
+  useEffect(() => {
+    if (price != null && prev.current != null && price !== prev.current) setDir(price > prev.current ? "up" : "down");
+    prev.current = price;
+  }, [price]);
+  return dir;
+}
+
 export function TradeScreen() {
   const { t } = useTranslation();
   const { symbol, tf, open } = useApp();
@@ -35,39 +48,62 @@ export function TradeScreen() {
   const ticker = tickers[symbol];
   const coin = getCoin(symbol)!;
   const now = useNow(1000);
+  const dir = useTickDirection(ticker?.last);
+  const [pairsOpen, setPairsOpen] = useState(false);
+  const [view, setView] = useState<"order" | "positions">("order");
 
   return (
     <div className="screen trade">
-      <CoinBar />
+      <div className="pair-head">
+        <button
+          className="pair-btn"
+          onClick={() => {
+            haptic.tap();
+            setPairsOpen(true);
+          }}
+        >
+          <b>{coin.base}USDT</b>
+          <span className="muted small">{t("trade.perp")}</span>
+          <Icon name="chevron" size={16} />
+        </button>
+        <div className={`price mono ${dir}`}>{ticker ? formatPrice(ticker.last, coin.pricePrecision) : "—"}</div>
+      </div>
+      <div className="ticker-stats">
+        <div>
+          <span className="muted">{t("market.mark")}</span>
+          <span className="mono">{ticker ? formatPrice(ticker.mark, coin.pricePrecision) : "—"}</span>
+        </div>
+        <div>
+          <span className="muted">{t("market.funding")}</span>
+          <span className="mono">
+            {ticker ? `${formatPercent(ticker.fundingRate)} · ${countdown(ticker.nextFundingTime - now)}` : "—"}
+          </span>
+        </div>
+      </div>
       {!connected && <div className="banner">{t("market.offline")}</div>}
       {connected && stale && <div className="banner">{t("market.stale")}</div>}
-      <div className="price-row">
-        <div>
-          <div className="pair">{coin.base}/USDT · Perp</div>
-          <div className="price mono">{ticker ? formatPrice(ticker.last, coin.pricePrecision) : "—"}</div>
-        </div>
-        {ticker && (
-          <div className="funding">
-            <span className="muted">{t("market.funding")}</span>
-            <span className="mono">{formatPercent(ticker.fundingRate)}</span>
-            <span className="muted small">
-              {t("market.nextFunding", { time: countdown(ticker.nextFundingTime - now) })}
-            </span>
-          </div>
-        )}
-      </div>
+
       <TimeframeTabs />
       <PriceChart symbol={symbol} tf={tf} />
       <LoanBanner />
-      <TradePanel />
-      {open.length > 0 && (
-        <>
-          <h3>{t("positions.open")}</h3>
-          {open.map((p) => (
-            <OpenPositionCard key={p.id} position={p} />
-          ))}
-        </>
+
+      <div className="segment">
+        <button className={view === "order" ? "seg active" : "seg"} onClick={() => setView("order")}>
+          {t("trade.order")}
+        </button>
+        <button className={view === "positions" ? "seg active" : "seg"} onClick={() => setView("positions")}>
+          {t("positions.open")} ({open.length})
+        </button>
+      </div>
+      {view === "order" ? (
+        <TradePanel />
+      ) : open.length === 0 ? (
+        <p className="muted">{t("positions.none")}</p>
+      ) : (
+        open.map((p) => <OpenPositionCard key={p.id} position={p} />)
       )}
+
+      {pairsOpen && <CoinSheet onClose={() => setPairsOpen(false)} />}
     </div>
   );
 }

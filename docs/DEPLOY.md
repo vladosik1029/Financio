@@ -50,8 +50,10 @@ WEBAPP_URL=https://fin.izzinet.xyz
 CORS_ORIGINS=https://fin.izzinet.xyz
 PRICE_FEED=binance
 DEV_AUTH_BYPASS=false
-ADMIN_TOKEN=<openssl rand -hex 24>
+ADMIN_TELEGRAM_IDS=<ваш Telegram ID>
 ```
+
+`ADMIN_TELEGRAM_IDS` открывает вкладку «Админ» прямо в MiniApp. Свой ID видно в игре на вкладке «Профиль». Если нужна админка и в обычном браузере, добавьте ещё `ADMIN_TOKEN=<openssl rand -hex 24>`: это пароль для страницы `/admin`.
 
 Игроки и сделки хранятся во встроенной базе в Docker-томе `server_data`, он переживает перезапуски и обновления. Резервная копия: `docker compose stop server`, затем `docker run --rm -v financio_server_data:/data -v $PWD:/backup alpine tar czf /backup/financio-db.tgz /data`, затем `docker compose start server`.
 
@@ -69,7 +71,7 @@ curl https://fin.izzinet.xyz/api/health        # {"ok":true,"feed":"binance","st
 docker compose logs -f server                  # строка «Binance: подключено»
 ```
 
-Откройте `https://fin.izzinet.xyz` в браузере: должен появиться терминал с живым графиком. Админка открывается по адресу `https://fin.izzinet.xyz/admin`, пароль — `ADMIN_TOKEN`.
+Откройте `https://fin.izzinet.xyz` в браузере: должен появиться терминал с живым графиком. Админка открывается во вкладке «Админ» в MiniApp у игроков из `ADMIN_TELEGRAM_IDS`, а при заданном `ADMIN_TOKEN` ещё и по адресу `https://fin.izzinet.xyz/admin`.
 
 ## 5. Telegram
 
