@@ -1,4 +1,22 @@
 services:
+  # HTTPS, MiniApp и проксирование API на домене из DOMAIN
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    environment:
+      DOMAIN: ${DOMAIN:?укажите DOMAIN в .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - server
+    restart: unless-stopped
+
   server:
     build:
       context: .
@@ -6,8 +24,8 @@ services:
     env_file: .env
     environment:
       DEV_AUTH_BYPASS: "false"
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     restart: unless-stopped
 
   bot:
@@ -27,15 +45,15 @@ services:
       POSTGRES_DB: financio
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "127.0.0.1:5432:5432"
     restart: unless-stopped
+    profiles: ["db"]
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "127.0.0.1:6379:6379"
     restart: unless-stopped
+    profiles: ["db"]
 
 volumes:
+  caddy_data:
+  caddy_config:
   pgdata:
