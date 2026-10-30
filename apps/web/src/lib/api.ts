@@ -1,7 +1,10 @@
 import type { Candle, Coin, Ticker, Timeframe, TimeframeId } from "@financio/shared";
 import { tg } from "./telegram";
 
-export const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8080").replace(/\/$/, "");
+/** В проде MiniApp и API живут на одном домене, локально API на :8080 */
+export const API_URL = (
+  import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:8080" : window.location.origin)
+).replace(/\/$/, "");
 export const WS_URL = `${API_URL.replace(/^http/, "ws")}/ws`;
 
 async function get<T>(path: string): Promise<T> {

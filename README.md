@@ -79,15 +79,14 @@ pnpm build
 | `DEV_AUTH_BYPASS` | server | Вход без Telegram для разработки. В production запрещён |
 | `BINANCE_WS_URL`, `BINANCE_REST_URL` | server | Переопределить адреса Binance (необязательно) |
 | `PORT` | server | Порт API, по умолчанию 8080 |
-| `VITE_API_URL` | web | Адрес API, которым пользуется MiniApp |
+| `DOMAIN` | deploy | Домен MiniApp, для него Caddy получает сертификат |
+| `VITE_API_URL` | web | Адрес API. Пусто в проде (тот же домен), локально `http://localhost:8080` |
 | `WEBAPP_URL` | bot | HTTPS-адрес опубликованного MiniApp |
 | `DATABASE_URL`, `REDIS_URL` | server | Понадобятся с этапа 2 |
 
 ## Деплой
 
-1. **MiniApp** — статический сайт: `pnpm --filter @financio/web build`, папку `apps/web/dist` публикуем на Cloudflare Pages, Vercel или любой HTTPS-хостинг. Telegram открывает MiniApp только по HTTPS.
-2. **Сервер** — на VPS через Docker Compose: `docker compose up -d --build`. Перед этим проверьте, что Binance отвечает с IP сервера (`curl https://fapi.binance.com/fapi/v1/ping`): с американских IP он закрыт.
-3. **Бот** — `docker compose --profile bot up -d --build`. В BotFather можно дополнительно привязать MiniApp к боту через `/newapp`.
+Всё поднимается на одном сервере командой `docker compose --profile bot up -d --build`: Caddy раздаёт MiniApp и сам получает HTTPS, API и бот работают рядом. Пошаговая инструкция: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## API
 
