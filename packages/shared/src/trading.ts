@@ -98,3 +98,45 @@ export function fundingPayment(side: Side, notional: number, fundingRate: number
   const amount = notional * fundingRate;
   return side === "long" ? -amount : amount;
 }
+
+/**
+ * Цена ликвидации для произвольной маржи (после funding или добавления маржи).
+ * Позиция ликвидируется, когда маржа + PnL опускаются до MMR × объём при входе.
+ */
+export function liquidationPriceForMargin(
+  side: Side,
+  entryPrice: number,
+  quantity: number,
+  margin: number,
+  mmr: number,
+): number {
+  const buffer = (margin - mmr * entryPrice * quantity) / quantity;
+  return side === "long" ? entryPrice - buffer : entryPrice + buffer;
+}
+
+/** Проскальзывание рыночного ордера: больше для крупных позиций */
+export function slippageRate(notional: number): number {
+  return notional > 100_000 ? 0.0005 : 0.0001;
+}
+
+/**
+ * Цена исполнения рыночного ордера с проскальзыванием.
+ * Открытие лонга и закрытие шорта — покупка (дороже), остальное — продажа (дешевле).
+ */
+export function fillPrice(side: Side, action: "open" | "close", price: number, notional: number): number {
+  const buying = (side === "long") === (action === "open");
+  const rate = slippageRate(notional);
+  return buying ? price * (1 + rate) : price * (1 - rate);
+}
+
+/** Сработал ли Take Profit при текущей цене */
+export function takeProfitHit(side: Side, price: number, takeProfit: number | null): boolean {
+  if (takeProfit == null) return false;
+  return side === "long" ? price >= takeProfit : price <= takeProfit;
+}
+
+/** Сработал ли Stop Loss при текущей цене */
+export function stopLossHit(side: Side, price: number, stopLoss: number | null): boolean {
+  if (stopLoss == null) return false;
+  return side === "long" ? price <= stopLoss : price >= stopLoss;
+}

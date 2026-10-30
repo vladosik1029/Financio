@@ -13,6 +13,8 @@ const schema = z.object({
   CORS_ORIGINS: z.string().default("http://localhost:5173"),
   DEV_AUTH_BYPASS: bool,
   NODE_ENV: z.string().default("development"),
+  DATABASE_URL: z.string().default("pglite://./data/pglite"),
+  ADMIN_TOKEN: z.string().default(""),
 });
 
 const env = schema.parse(process.env);
@@ -27,4 +29,11 @@ export const config = {
   priceFeed: env.PRICE_FEED,
   corsOrigins: env.CORS_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean),
   devAuthBypass: env.DEV_AUTH_BYPASS,
+  databaseUrl: env.DATABASE_URL,
+  /** Пароль админки. Пустой — админка выключена */
+  adminToken: env.ADMIN_TOKEN,
 };
+
+if (config.adminToken && config.adminToken.length < 16) {
+  throw new Error("ADMIN_TOKEN должен быть не короче 16 символов");
+}

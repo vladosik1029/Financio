@@ -9,3 +9,14 @@ export function formatUsd(value: number): string {
 export function formatPercent(fraction: number, digits = 4): string {
   return `${(fraction * 100).toFixed(digits)}%`;
 }
+
+export function formatSigned(value: number): string {
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  return `${sign}${formatUsd(Math.abs(value))}`;
+}
+
+/** Ошибку API превращаем в ключ перевода */
+export function errorKey(err: unknown): string {
+  const code = (err as { code?: string })?.code ?? "internal";
+  return `errors.${code}`;
+}

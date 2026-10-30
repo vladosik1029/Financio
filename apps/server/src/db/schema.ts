@@ -1,0 +1,89 @@
+import {
+  bigint,
+  bigserial,
+  boolean,
+  doublePrecision,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
+
+export const users = pgTable("users", {
+  /** Telegram ID игрока */
+  id: bigint("id", { mode: "number" }).primaryKey(),
+  firstName: text("first_name").notNull(),
+  username: text("username"),
+  languageCode: text("language_code"),
+  balance: doublePrecision("balance").notNull(),
+  level: integer("level").notNull().default(1),
+  xp: integer("xp").notNull().default(0),
+  banned: boolean("banned").notNull().default(false),
+  lastLoanAt: timestamp("last_loan_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const positions = pgTable(
+  "positions",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id),
+    symbol: text("symbol").notNull(),
+    side: text("side", { enum: ["long", "short"] }).notNull(),
+    status: text("status", { enum: ["open", "closed", "liquidated"] }).notNull().default("open"),
+    leverage: integer("leverage").notNull(),
+    margin: doublePrecision("margin").notNull(),
+    invested: doublePrecision("invested").notNull(),
+    quantity: doublePrecision("quantity").notNull(),
+    entryPrice: doublePrecision("entry_price").notNull(),
+    liquidationPrice: doublePrecision("liquidation_price").notNull(),
+    takeProfit: doublePrecision("take_profit"),
+    stopLoss: doublePrecision("stop_loss"),
+    openFee: doublePrecision("open_fee").notNull(),
+    closeFee: doublePrecision("close_fee").notNull().default(0),
+    fundingPaid: doublePrecision("funding_paid").notNull().default(0),
+    exitPrice: doublePrecision("exit_price"),
+    realizedPnl: doublePrecision("realized_pnl"),
+    closeReason: text("close_reason", {
+      enum: ["manual", "take_profit", "stop_loss", "liquidation", "admin"],
+    }),
+    openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (t) => [index("positions_user_status_idx").on(t.userId, t.status), index("positions_status_idx").on(t.status)],
+);
+
+/** Журнал всех изменений баланса и маржи: для разбора спорных случаев и откатов */
+export const ledger = pgTable(
+  "ledger",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id),
+    type: text("type", {
+      enum: ["start", "open", "close", "add_margin", "funding", "loan", "admin_adjust"],
+    }).notNull(),
+    amount: doublePrecision("amount").notNull(),
+    balanceAfter: doublePrecision("balance_after").notNull(),
+    positionId: integer("position_id"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("ledger_user_idx").on(t.userId, t.createdAt)],
+);
+
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type UserRow = typeof users.$inferSelect;
+export type PositionRow = typeof positions.$inferSelect;

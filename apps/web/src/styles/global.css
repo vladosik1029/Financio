@@ -362,3 +362,160 @@ button:disabled {
 .tab-icon {
   font-size: 18px;
 }
+
+h3 {
+  margin: 20px 0 10px;
+  font-size: 15px;
+}
+.link {
+  color: var(--gold);
+  font-weight: 500;
+  padding: 0;
+}
+.protection {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+.protection label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.input.wide {
+  width: 100%;
+  text-align: left;
+}
+.toast.error {
+  border-color: var(--down);
+  color: var(--down);
+}
+.chip-danger {
+  background: rgba(234, 57, 67, 0.15);
+  color: var(--down);
+}
+
+/* Позиции */
+.pos,
+.hist {
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.hist {
+  padding: 10px 12px;
+}
+.pos-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pos-coin {
+  font-weight: 600;
+}
+.pos-pnl {
+  margin-left: auto;
+  font-weight: 600;
+}
+.tag {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.tag-long {
+  background: rgba(22, 199, 132, 0.15);
+  color: var(--up);
+}
+.tag-short {
+  background: rgba(234, 57, 67, 0.15);
+  color: var(--down);
+}
+.pos-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px 8px;
+  font-size: 12px;
+}
+.pos-sub {
+  margin-top: 6px;
+}
+.pos-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* Кредит */
+.loan {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gold);
+  background: rgba(245, 185, 66, 0.08);
+}
+.loan > div {
+  flex: 1;
+}
+.btn-gold {
+  background: var(--gold);
+  color: #1a1204;
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
+/* Оверлей событий */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 7, 12, 0.8);
+  z-index: 10;
+  animation: fade 0.2s ease;
+}
+.overlay-liq {
+  background: radial-gradient(circle, rgba(234, 57, 67, 0.35), rgba(5, 7, 12, 0.92));
+  animation: fade 0.2s ease, flash 0.6s ease 2;
+}
+.overlay-card {
+  width: 100%;
+  max-width: 340px;
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.overlay-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+}
+.overlay-pnl {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 4px 0 18px;
+}
+.overlay-card .btn {
+  width: 100%;
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes flash {
+  50% {
+    background-color: rgba(234, 57, 67, 0.5);
+  }
+}

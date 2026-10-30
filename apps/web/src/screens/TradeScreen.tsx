@@ -2,6 +2,8 @@ import { getCoin } from "@financio/shared";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CoinBar } from "../components/CoinBar";
+import { LoanBanner } from "../components/LoanBanner";
+import { OpenPositionCard } from "../components/PositionCard";
 import { PriceChart } from "../components/PriceChart";
 import { TimeframeTabs } from "../components/TimeframeTabs";
 import { TradePanel } from "../components/TradePanel";
@@ -28,7 +30,7 @@ function countdown(ms: number): string {
 
 export function TradeScreen() {
   const { t } = useTranslation();
-  const { symbol, tf } = useApp();
+  const { symbol, tf, open } = useApp();
   const { tickers, stale, connected } = useMarket();
   const ticker = tickers[symbol];
   const coin = getCoin(symbol)!;
@@ -56,7 +58,16 @@ export function TradeScreen() {
       </div>
       <TimeframeTabs />
       <PriceChart symbol={symbol} tf={tf} />
+      <LoanBanner />
       <TradePanel />
+      {open.length > 0 && (
+        <>
+          <h3>{t("positions.open")}</h3>
+          {open.map((p) => (
+            <OpenPositionCard key={p.id} position={p} />
+          ))}
+        </>
+      )}
     </div>
   );
 }

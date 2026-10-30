@@ -4,13 +4,16 @@ import {
   ColorType,
   createChart,
   CrosshairMode,
+  LineStyle,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { useEffect, useRef } from "react";
 import { api } from "../lib/api";
 import { marketSocket } from "../lib/market";
+import { useApp } from "../lib/store";
 
 /** Lightweight Charts рисует время в UTC, поэтому сдвигаем его в часовой пояс игрока */
 const TZ_OFFSET_SEC = -new Date().getTimezoneOffset() * 60;
@@ -23,6 +26,8 @@ export function PriceChart({ symbol, tf }: { symbol: string; tf: TimeframeId }) 
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const linesRef = useRef<IPriceLine[]>([]);
+  const positions = useApp((s) => s.open);
 
   useEffect(() => {
     const chart = createChart(containerRef.current!, {
@@ -93,6 +98,27 @@ export function PriceChart({ symbol, tf }: { symbol: string; tf: TimeframeId }) 
       unsubscribe();
     };
   }, [symbol, tf]);
+
+  // Линии входа, ликвидации, TP и SL открытых позиций по этой монете
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series) return;
+    for (const line of linesRef.current) series.removePriceLine(line);
+    linesRef.current = [];
+    for (const p of positions) {
+      if (p.symbol !== symbol) continue;
+      const add = (price: number | null, color: string, title: string, style = LineStyle.Dashed) => {
+        if (price == null) return;
+        linesRef.current.push(
+          series.createPriceLine({ price, color, title, lineWidth: 1, lineStyle: style, axisLabelVisible: true }),
+        );
+      };
+      add(p.entryPrice, p.side === "long" ? "#16c784" : "#ea3943", `${p.side === "long" ? "L" : "S"} ${p.leverage}x`, LineStyle.Solid);
+      add(p.liquidationPrice, "#f5b942", "LIQ");
+      add(p.takeProfit, "#16c784", "TP");
+      add(p.stopLoss, "#ea3943", "SL");
+    }
+  }, [positions, symbol]);
 
   return <div className="chart" ref={containerRef} />;
 }
