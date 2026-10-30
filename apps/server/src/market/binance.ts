@@ -33,6 +33,9 @@ type BinanceKline = [number, string, string, string, string, string, ...unknown[
 /**
  * Публичные потоки Binance USDT-M Futures: сделки (aggTrade) и mark price
  * с ставкой funding (markPrice@1s). Ключ API не нужен.
+ *
+ * С 23.04.2026 Binance отключил старый адрес /stream: aggTrade и markPrice
+ * теперь отдаются только через /market/stream.
  */
 export class BinanceFeed implements PriceFeed {
   readonly name = "binance";
@@ -47,7 +50,7 @@ export class BinanceFeed implements PriceFeed {
   private readonly log: (msg: string) => void;
 
   constructor(private readonly opts: BinanceFeedOptions) {
-    this.wsUrl = opts.wsUrl ?? "wss://fstream.binance.com/stream";
+    this.wsUrl = opts.wsUrl ?? "wss://fstream.binance.com/market/stream";
     this.restUrl = opts.restUrl ?? "https://fapi.binance.com";
     this.silenceTimeoutMs = opts.silenceTimeoutMs ?? 10_000;
     this.log = opts.log ?? (() => {});
