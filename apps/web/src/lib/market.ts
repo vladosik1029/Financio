@@ -92,6 +92,10 @@ class MarketSocket {
         }
         break;
       }
+      case "progress":
+        haptic.success();
+        useApp.getState().applyProgress(msg);
+        break;
       case "balance":
         useApp.getState().setBalance(msg.balance);
         break;

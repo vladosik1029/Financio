@@ -1,4 +1,4 @@
-import { unrealizedPnl, type Position, type Ticker } from "@financio/shared";
+import { COINS, unrealizedPnl, type Position, type Profile, type Ticker } from "@financio/shared";
 
 /** Ранг трейдера по уровню: ключ перевода ranks.* */
 export function rankKey(level: number): string {
@@ -54,23 +54,54 @@ export function tradeStats(history: Position[], now = Date.now()): TradeStats {
   };
 }
 
-export interface Quest {
-  id: "trades" | "profit" | "stopLoss";
-  progress: number;
-  goal: number;
+/** Сколько последних закрытых сделок подряд ушли в минус */
+export function lossStreak(history: Position[]): number {
+  let n = 0;
+  for (const p of history) {
+    if ((p.realizedPnl ?? 0) >= 0) break;
+    n++;
+  }
+  return n;
 }
 
+export interface MentorTip {
+  /** Ключ перевода mentor.* */
+  key: string;
+  params?: Record<string, string | number>;
+  /** warn — предупреждение (тильт, ликвидация), tip — совет */
+  tone: "warn" | "tip";
+}
+
+const GENERAL_TIPS = ["riskPerTrade", "trend", "limitOrders", "funding", "patience"];
+
 /**
- * Квесты дня считаются по сделкам за сегодня. Награды опытом начислит сервер,
- * когда появятся уровни (этап 3), пока это только прогресс.
+ * Наставник смотрит на состояние игрока и выбирает одну самую важную реплику.
+ * Порядок — от срочного к общему.
  */
-export function dailyQuests(open: Position[], history: Position[], now = Date.now()): Quest[] {
-  const today = startOfToday(now);
-  const openedToday = [...open, ...history].filter((p) => p.openedAt >= today);
-  const closedToday = history.filter((p) => (p.closedAt ?? 0) >= today);
-  return [
-    { id: "trades", progress: Math.min(openedToday.length, 3), goal: 3 },
-    { id: "profit", progress: closedToday.some((p) => (p.realizedPnl ?? 0) > 0) ? 1 : 0, goal: 1 },
-    { id: "stopLoss", progress: openedToday.some((p) => p.stopLoss != null) ? 1 : 0, goal: 1 },
-  ];
+export function mentorTip(profile: Profile, open: Position[], history: Position[], now = Date.now()): MentorTip {
+  if (profile.canTakeLoan) return { key: "loan", params: { amount: profile.loanAmount }, tone: "warn" };
+  const last = history[0];
+  if (last?.closeReason === "liquidation" && now - (last.closedAt ?? 0) < 3600_000) {
+    return { key: "afterLiquidation", params: { lev: last.leverage }, tone: "warn" };
+  }
+  const streak = lossStreak(history);
+  if (streak >= 3) return { key: "tilt", params: { n: streak }, tone: "warn" };
+  if (history.length === 0 && open.length === 0) return { key: "welcome", tone: "tip" };
+  const unprotected = open.filter((p) => p.stopLoss == null);
+  if (unprotected.length > 0) return { key: "noStopLoss", params: { n: unprotected.length }, tone: "warn" };
+  if (open.some((p) => p.leverage >= 50)) return { key: "highLeverage", tone: "warn" };
+  const quest = profile.quests.find((q) => !q.done);
+  if (quest) return { key: "quest", params: { quest: quest.id, xp: quest.xp }, tone: "tip" };
+  const nextCoin = COINS.find((c) => c.minLevel > profile.level);
+  if (nextCoin) return { key: "nextUnlock", params: { coin: nextCoin.base, level: nextCoin.minLevel }, tone: "tip" };
+  const day = Math.floor(now / 86_400_000);
+  return { key: `tips.${GENERAL_TIPS[day % GENERAL_TIPS.length]}`, tone: "tip" };
+}
+
+/** Сколько осталось до обновления квестов (полночь UTC), чч:мм */
+export function untilQuestReset(now = Date.now()): string {
+  const left = 86_400_000 - (now % 86_400_000);
+  const h = Math.floor(left / 3600_000);
+  const m = Math.floor((left % 3600_000) / 60_000);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }

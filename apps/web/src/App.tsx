@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { AlertOverlay } from "./components/AlertOverlay";
 import { GlobalToast } from "./components/GlobalToast";
+import { LevelUpOverlay } from "./components/LevelUpOverlay";
 import { TabBar } from "./components/TabBar";
 import { useApp } from "./lib/store";
 import { tg } from "./lib/telegram";
@@ -34,6 +35,7 @@ export function App() {
       <TabBar />
       <GlobalToast />
       <AlertOverlay />
+      <LevelUpOverlay />
     </div>
   );
 }

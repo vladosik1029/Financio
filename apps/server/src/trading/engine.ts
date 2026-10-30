@@ -12,6 +12,7 @@ import {
   MAKER_FEE_RATE,
   maxLeverageForLevel,
   MIN_LEVERAGE,
+  xpToNextLevel,
   orderPriceValid,
   orderTriggered,
   stopLossHit,
@@ -32,6 +33,7 @@ import type { TelegramUser } from "../auth/telegram.js";
 import type { Db } from "../db/index.js";
 import { ledger, orders, positions, users, type OrderRow, type PositionRow, type UserRow } from "../db/schema.js";
 import { toOrder, toPosition } from "./mappers.js";
+import { ProgressService } from "./progress.js";
 import type { SettingsStore } from "./settings.js";
 
 export class TradeError extends Error {
@@ -82,6 +84,7 @@ export class TradingEngine {
   private readonly closing = new Set<number>();
   private readonly pendingOrders = new Map<number, WatchedOrder>();
   private readonly filling = new Set<number>();
+  readonly progress: ProgressService;
 
   constructor(
     private readonly db: Db,
@@ -90,7 +93,9 @@ export class TradingEngine {
     private readonly notify: Notify = () => {},
     private readonly now: () => number = Date.now,
     private readonly log: (msg: string) => void = () => {},
-  ) {}
+  ) {
+    this.progress = new ProgressService(db, notify, now);
+  }
 
   /** Загружает открытые позиции в память после старта сервера */
   async init(): Promise<void> {
@@ -147,7 +152,7 @@ export class TradingEngine {
     return {
       level: user.level,
       xp: user.xp,
-      xpToNext: user.level * 100,
+      xpToNext: xpToNextLevel(user.level),
       balance: user.balance,
       minLeverage: MIN_LEVERAGE,
       maxLeverage: maxLeverageForLevel(user.level),
@@ -155,6 +160,7 @@ export class TradingEngine {
       takerFeeRate: s.takerFeeRate,
       canTakeLoan: this.loanAvailable(user),
       loanAmount: s.loanAmount,
+      quests: await this.progress.quests(userId),
     };
   }
 
@@ -249,6 +255,7 @@ export class TradingEngine {
     const position = toPosition(row);
     this.notify(userId, { type: "position", event: "opened", position });
     this.notify(userId, { type: "balance", balance });
+    this.track(this.progress.onPositionOpened(userId));
     return position;
   }
 
@@ -550,6 +557,7 @@ export class TradingEngine {
       const position = toPosition(row);
       this.notify(row.userId, { type: "position", event: "closed", position });
       this.notify(row.userId, { type: "balance", balance });
+      this.track(this.progress.onPositionClosed(position, row.userId));
       return position;
     } finally {
       this.closing.delete(positionId);
@@ -674,6 +682,7 @@ export class TradingEngine {
       this.notify(result.filled.userId, { type: "order", event: "filled", order: toOrder(result.filled) });
       this.notify(result.filled.userId, { type: "position", event: "opened", position: toPosition(result.position) });
       this.notify(result.filled.userId, { type: "balance", balance: result.balance });
+      this.track(this.progress.onPositionOpened(result.filled.userId));
     } finally {
       this.filling.delete(orderId);
     }
@@ -729,6 +738,11 @@ export class TradingEngine {
     this.notify(row.userId, { type: "order", event, order });
     this.notify(row.userId, { type: "balance", balance });
     return order;
+  }
+
+  /** Опыт и квесты считаются после сделки и не задерживают ответ игроку */
+  private track(task: Promise<void>): void {
+    task.catch((err) => this.log(`Прогресс не обновлён: ${(err as Error).message}`));
   }
 
   private watchOrder(row: OrderRow): void {

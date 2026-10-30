@@ -12,6 +12,7 @@ export function GlobalToast() {
     type: p.type ? t(`orders.types.${p.type}`) : "",
     side: p.side ? t(`trade.${p.side}`) : "",
     reason: p.reason ? t(`errors.${p.reason}`) : "",
+    quest: p.quest ? t(`quests.${p.quest}`) : "",
   });
   return <div className={toast.error ? "toast error floating" : "toast floating"}>{text}</div>;
 }

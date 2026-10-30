@@ -15,6 +15,13 @@
       "when": 1793398744299,
       "tag": "0001_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793399090750,
+      "tag": "0002_progress",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,4 @@
+import type { QuestId, QuestState } from "./progress.js";
 import type { TimeframeId } from "./timeframes.js";
 
 export type Side = "long" | "short";
@@ -40,6 +41,18 @@ export type ServerMessage =
   /** Личные события игрока: приходят только при подключении с initData */
   | { type: "position"; event: "opened" | "updated" | "closed"; position: Position }
   | { type: "order"; event: OrderEvent; order: Order }
+  /** Начислен опыт: за сделку или квест; при новом уровне приходит и бонус на баланс */
+  | {
+      type: "progress";
+      reason: "trade" | "quest";
+      questId?: QuestId;
+      gained: number;
+      level: number;
+      xp: number;
+      xpToNext: number;
+      levelsGained: number[];
+      bonus: number;
+    }
   | { type: "balance"; balance: number };
 
 export type PositionStatus = "open" | "closed" | "liquidated";
@@ -114,6 +127,8 @@ export interface Profile {
   takerFeeRate: number;
   canTakeLoan: boolean;
   loanAmount: number;
+  /** Квесты дня с прогрессом, считает сервер */
+  quests: QuestState[];
 }
 
 /** Настройки игры, которые меняются из админки */

@@ -32,7 +32,7 @@ describe("TradingEngine", () => {
   });
 
   beforeEach(async () => {
-    await database.db.execute(sql`TRUNCATE ledger, orders, positions, users, settings RESTART IDENTITY CASCADE`);
+    await database.db.execute(sql`TRUNCATE ledger, quest_claims, orders, positions, users, settings RESTART IDENTITY CASCADE`);
     market = new FakeMarket();
     market.set("BTCUSDT", 50_000);
     market.set("SOLUSDT", 150);
@@ -233,6 +233,49 @@ describe("TradingEngine", () => {
       await restarted.init();
       restarted.onMark("BTCUSDT", 48_000);
       await vi.waitFor(async () => expect(await restarted.listPositions(USER.id, "open")).toHaveLength(1));
+    });
+  });
+
+  describe("опыт и квесты", () => {
+    const profile = () => engine.getProfile(USER.id);
+
+    it("прибыльная сделка даёт опыт, слишком короткая — нет", async () => {
+      const quick = await open();
+      market.set("BTCUSDT", 51_000);
+      await engine.closePosition(USER.id, quick.id);
+      await new Promise((r) => setTimeout(r, 50));
+      expect((await profile()).xp).toBe(0);
+
+      market.set("BTCUSDT", 50_000);
+      const p = await open();
+      now += 60_000;
+      market.set("BTCUSDT", 51_000);
+      await engine.closePosition(USER.id, p.id);
+      // ~+18% к марже: 15 + 9 XP, плюс квест «закрой сделку в плюс» +40
+      await vi.waitFor(async () => expect((await profile()).xp).toBe(64));
+      const progress = events.filter((e) => e.msg.type === "progress");
+      expect(progress.map((e) => (e.msg as { reason: string }).reason)).toEqual(["trade", "quest"]);
+    });
+
+    it("квесты дня награждают один раз, новый уровень даёт бонус на баланс", async () => {
+      for (let i = 0; i < 3; i++) await open({ stopLoss: 49_000 });
+      // «3 сделки» (30) + «со стоп-лоссом» (30)
+      await vi.waitFor(async () => expect((await profile()).xp).toBe(60));
+      await open({ stopLoss: 49_000 });
+      await new Promise((r) => setTimeout(r, 50));
+      const p = await profile();
+      expect(p.xp).toBe(60);
+      expect(p.quests.filter((q) => q.done).map((q) => q.id)).toEqual(["trades", "stopLoss"]);
+
+      // Следующие сутки: квесты заново
+      now += 24 * HOUR;
+      expect((await profile()).quests.every((q) => !q.done)).toBe(true);
+      const before = (await profile()).balance;
+      for (let i = 0; i < 3; i++) await open({ stopLoss: 49_000 });
+      // 60 + 30 + 30 = 120: уровень 2, остаток 20 XP и бонус $100
+      await vi.waitFor(async () => expect((await profile()).level).toBe(2));
+      expect((await profile()).xp).toBe(20);
+      expect((await profile()).balance).toBeCloseTo(before - 3 * 100.5 + 100);
     });
   });
 });

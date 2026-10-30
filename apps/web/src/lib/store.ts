@@ -1,4 +1,4 @@
-import type { Order, OrderEvent, Position, Profile, TimeframeId } from "@financio/shared";
+import type { Order, OrderEvent, Position, Profile, ServerMessage, TimeframeId } from "@financio/shared";
 import { create } from "zustand";
 import { api } from "./api";
 
@@ -25,6 +25,8 @@ interface AppState {
   alert: Alert | null;
   /** Короткое уведомление внизу экрана: исполнение или отклонение ордера */
   toast: Toast | null;
+  /** Только что взятый уровень: показываем поздравление */
+  levelUp: { level: number; bonus: number } | null;
   setTab(tab: Tab): void;
   setSymbol(symbol: string): void;
   setTf(tf: TimeframeId): void;
@@ -33,6 +35,8 @@ interface AppState {
   applyPosition(event: "opened" | "updated" | "closed", position: Position): void;
   applyOrder(event: OrderEvent, order: Order): void;
   showToast(toast: Toast): void;
+  applyProgress(msg: Extract<ServerMessage, { type: "progress" }>): void;
+  dismissLevelUp(): void;
   setBalance(balance: number): void;
   dismissAlert(): void;
 }
@@ -56,6 +60,7 @@ const DEFAULT_PROFILE: Profile = {
   takerFeeRate: 0.0005,
   canTakeLoan: false,
   loanAmount: 500,
+  quests: [],
 };
 
 export const useApp = create<AppState>((set, get) => ({
@@ -71,6 +76,7 @@ export const useApp = create<AppState>((set, get) => ({
   orders: [],
   alert: null,
   toast: null,
+  levelUp: null,
   setTab: (tab) => set({ tab }),
   setSymbol: (symbol) => set({ symbol }),
   setTf: (tf) => set({ tf }),
@@ -123,6 +129,20 @@ export const useApp = create<AppState>((set, get) => ({
       if (get().toast === toast) set({ toast: null });
     }, 3500);
   },
+
+  applyProgress(msg) {
+    set({ profile: { ...get().profile, level: msg.level, xp: msg.xp, xpToNext: msg.xpToNext } });
+    get().showToast({
+      key: msg.reason === "quest" ? "progress.quest" : "progress.trade",
+      params: { xp: msg.gained, quest: msg.questId ?? "" },
+    });
+    const level = msg.levelsGained[msg.levelsGained.length - 1];
+    if (level) set({ levelUp: { level, bonus: msg.bonus } });
+    // Новые квесты, плечо и монеты приходят с профилем
+    void api.me().then((me) => set({ profile: me.profile })).catch(() => {});
+  },
+
+  dismissLevelUp: () => set({ levelUp: null }),
 
   setBalance: (balance) => set({ profile: { ...get().profile, balance } }),
   dismissAlert: () => set({ alert: null }),
