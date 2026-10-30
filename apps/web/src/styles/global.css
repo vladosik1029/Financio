@@ -1,0 +1,364 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap");
+
+:root {
+  --bg: #0b0e14;
+  --surface: #121722;
+  --surface-2: #1a2030;
+  --border: #1f2633;
+  --text: #e6e9f0;
+  --muted: #8b93a7;
+  --up: #16c784;
+  --down: #ea3943;
+  --gold: #f5b942;
+  --radius: 12px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.mono {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 12px;
+}
+.accent {
+  color: var(--gold);
+}
+.up {
+  color: var(--up);
+}
+.down {
+  color: var(--down);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-top: env(safe-area-inset-top);
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.screen {
+  padding: 0 16px 16px;
+}
+
+/* HUD */
+.hud {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.hud-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--gold), #c27c0e);
+  color: #1a1204;
+}
+.hud-main {
+  flex: 1;
+  min-width: 0;
+}
+.hud-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+}
+.hud-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hud-level {
+  color: var(--gold);
+}
+.xp-bar {
+  margin-top: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.xp-fill {
+  height: 100%;
+  background: var(--gold);
+  transition: width 0.4s ease;
+}
+.hud-balance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 12px;
+}
+.hud-balance .mono {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Монеты */
+.coinbar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px 0 8px;
+  scrollbar-width: none;
+}
+.coinbar::-webkit-scrollbar {
+  display: none;
+}
+.coin {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.coin.active {
+  border-color: var(--gold);
+}
+.coin-base {
+  font-weight: 600;
+}
+.coin-price {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.banner {
+  margin: 4px 0 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: rgba(234, 57, 67, 0.12);
+  color: var(--down);
+  font-size: 13px;
+}
+
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 4px 0 8px;
+}
+.pair {
+  color: var(--muted);
+  font-size: 12px;
+}
+.price {
+  font-size: 26px;
+  font-weight: 600;
+}
+.funding {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 13px;
+}
+
+/* Таймфреймы и график */
+.tf-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-bottom: 8px;
+}
+.tf-tabs::-webkit-scrollbar {
+  display: none;
+}
+.tf {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+}
+.tf.active {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.chart {
+  height: 42vh;
+  min-height: 240px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  touch-action: pan-x pan-y;
+}
+
+/* Панель сделки */
+.panel {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+}
+.field-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.input {
+  width: 120px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  text-align: right;
+  font-size: 15px;
+}
+.chips {
+  display: flex;
+  gap: 6px;
+}
+.chip {
+  flex: 1;
+  padding: 6px 0;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+.chip.active {
+  background: var(--gold);
+  color: #1a1204;
+  font-weight: 600;
+}
+.slider {
+  width: 100%;
+  accent-color: var(--gold);
+}
+.stats {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+.stats dt {
+  color: var(--muted);
+}
+.stats dd {
+  margin: 0;
+  text-align: right;
+}
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.btn {
+  padding: 14px 0;
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-size: 16px;
+  color: #fff;
+}
+.btn-long {
+  background: var(--up);
+}
+.btn-short {
+  background: var(--down);
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.toast {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--gold);
+  font-size: 13px;
+}
+
+.placeholder {
+  padding-top: 48px;
+  text-align: center;
+}
+.profile {
+  padding-top: 16px;
+}
+
+/* Нижнее меню */
+.tabbar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 0 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.tab.active {
+  color: var(--gold);
+}
+.tab-icon {
+  font-size: 18px;
+}

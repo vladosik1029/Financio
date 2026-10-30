@@ -1,0 +1,41 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    env_file: .env
+    environment:
+      DEV_AUTH_BYPASS: "false"
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  bot:
+    build:
+      context: .
+      dockerfile: apps/bot/Dockerfile
+    env_file: .env
+    restart: unless-stopped
+    profiles: ["bot"]
+
+  # База и кэш понадобятся с этапа 2 (позиции, балансы, рейтинги)
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: financio
+      POSTGRES_PASSWORD: financio
+      POSTGRES_DB: financio
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
